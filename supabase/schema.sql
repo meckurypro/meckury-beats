@@ -258,8 +258,174 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Create song_submissions table
+CREATE TABLE IF NOT EXISTS song_submissions (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  beat_id UUID REFERENCES beats(id) ON DELETE CASCADE NOT NULL,
+  
+  -- Song info
+  song_title TEXT NOT NULL,
+  artist_name TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('spotify', 'youtube', 'apple_music', 'audiomack')),
+  external_url TEXT NOT NULL,
+  embed_url TEXT,
+  
+  -- Media
+  cover_art_url TEXT,
+  
+  -- Status
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  featured BOOLEAN DEFAULT FALSE,
+  
+  -- Admin notes
+  admin_notes TEXT,
+  approved_at TIMESTAMP WITH TIME ZONE,
+  rejected_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Create indexes for song_submissions
+CREATE INDEX idx_song_submissions_user_id ON song_submissions(user_id);
+CREATE INDEX idx_song_submissions_beat_id ON song_submissions(beat_id);
+CREATE INDEX idx_song_submissions_status ON song_submissions(status);
+CREATE INDEX idx_song_submissions_featured ON song_submissions(featured) WHERE featured = TRUE;
+CREATE INDEX idx_song_submissions_platform ON song_submissions(platform);
+
+-- Enable Row Level Security for song_submissions
+ALTER TABLE song_submissions ENABLE ROW LEVEL SECURITY;
+
+-- Song submissions policies
+CREATE POLICY "Users can view approved submissions"
+  ON song_submissions FOR SELECT
+  USING (status = 'approved');
+
+CREATE POLICY "Users can view own submissions"
+  ON song_submissions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own submissions"
+  ON song_submissions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own pending submissions"
+  ON song_submissions FOR UPDATE
+  USING (auth.uid() = user_id AND status = 'pending');
+
+CREATE POLICY "Admins can view all submissions"
+  ON song_submissions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
+CREATE POLICY "Admins can update all submissions"
+  ON song_submissions FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
+CREATE POLICY "Admins can delete submissions"
+  ON song_submissions FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
+-- Create song_submissions table
+CREATE TABLE IF NOT EXISTS song_submissions (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  beat_id UUID REFERENCES beats(id) ON DELETE CASCADE NOT NULL,
+  
+  -- Song info
+  song_title TEXT NOT NULL,
+  artist_name TEXT NOT NULL,
+  platform TEXT NOT NULL CHECK (platform IN ('spotify', 'youtube', 'apple_music', 'audiomack')),
+  external_url TEXT NOT NULL,
+  embed_url TEXT NOT NULL,
+  
+  -- Media
+  cover_art_url TEXT,
+  
+  -- Status
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  featured BOOLEAN DEFAULT FALSE,
+  
+  -- Admin
+  admin_notes TEXT,
+  approved_at TIMESTAMP WITH TIME ZONE,
+  approved_by UUID REFERENCES profiles(id)
+);
+
+-- Create indexes for song_submissions
+CREATE INDEX idx_song_submissions_user_id ON song_submissions(user_id);
+CREATE INDEX idx_song_submissions_beat_id ON song_submissions(beat_id);
+CREATE INDEX idx_song_submissions_status ON song_submissions(status);
+CREATE INDEX idx_song_submissions_approved ON song_submissions(status) WHERE status = 'approved';
+CREATE INDEX idx_song_submissions_featured ON song_submissions(featured) WHERE featured = TRUE;
+
+-- Enable RLS for song_submissions
+ALTER TABLE song_submissions ENABLE ROW LEVEL SECURITY;
+
+-- Song submissions policies
+CREATE POLICY "Users can view own submissions"
+  ON song_submissions FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can create own submissions"
+  ON song_submissions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Public can view approved submissions"
+  ON song_submissions FOR SELECT
+  USING (status = 'approved');
+
+CREATE POLICY "Admins can view all submissions"
+  ON song_submissions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
+CREATE POLICY "Admins can update submissions"
+  ON song_submissions FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
+CREATE POLICY "Admins can delete submissions"
+  ON song_submissions FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+      AND profiles.is_admin = TRUE
+    )
+  );
+
 -- Storage buckets setup (run these in Supabase dashboard)
 -- Bucket: beat-covers (public)
 -- Bucket: beat-audio (public for streaming, auth required for download)
 -- Bucket: stems (private, auth required)
 -- Bucket: portfolio (public)
+-- Bucket: song-covers (public) - for user-submitted song cover art
+-- Bucket: song-covers (public) - for user-submitted song cover arts
