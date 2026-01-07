@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-text-primary antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply font-bold;
+  }
+}
+
+@layer components {
+  /* Custom Scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-background-card;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-meckury-mediumGray rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-meckury-lightGray;
+  }
+
+  /* Button Styles */
+  .btn-primary {
+    @apply bg-meckury-primary hover:bg-opacity-90 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 hover:shadow-glow;
+  }
+
+  .btn-secondary {
+    @apply bg-meckury-secondary hover:bg-opacity-90 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+
+  .btn-outline {
+    @apply border-2 border-meckury-primary text-meckury-primary hover:bg-meckury-primary hover:text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply text-text-primary hover:bg-background-elevated font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+
+  /* Card Styles */
+  .card {
+    @apply bg-background-card rounded-xl p-6 shadow-card transition-all duration-200 hover:shadow-lg;
+  }
+
+  .card-beat {
+    @apply bg-background-card rounded-xl overflow-hidden shadow-card transition-all duration-300 hover:shadow-glow hover:-translate-y-1 cursor-pointer;
+  }
+
+  /* Input Styles */
+  .input {
+    @apply w-full bg-background-elevated border border-meckury-mediumGray rounded-lg px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-meckury-primary focus:ring-2 focus:ring-meckury-primary focus:ring-opacity-20 transition-all;
+  }
+
+  .textarea {
+    @apply w-full bg-background-elevated border border-meckury-mediumGray rounded-lg px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-meckury-primary focus:ring-2 focus:ring-meckury-primary focus:ring-opacity-20 transition-all resize-none;
+  }
+
+  /* Badge Styles */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
+  .badge-primary {
+    @apply bg-meckury-primary bg-opacity-20 text-meckury-primary;
+  }
+
+  .badge-success {
+    @apply bg-meckury-success bg-opacity-20 text-meckury-success;
+  }
+
+  .badge-warning {
+    @apply bg-meckury-accent bg-opacity-20 text-meckury-accent;
+  }
+
+  /* Link Styles */
+  .link {
+    @apply text-meckury-primary hover:text-meckury-accent transition-colors duration-200 underline-offset-4 hover:underline;
+  }
+
+  /* Waveform Container */
+  .waveform-container {
+    @apply w-full h-20 bg-background-elevated rounded-lg overflow-hidden;
+  }
+
+  /* Loading Spinner */
+  .spinner {
+    @apply inline-block w-5 h-5 border-2 border-meckury-primary border-t-transparent rounded-full animate-spin;
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-meckury-primary via-meckury-accent to-meckury-primary bg-clip-text text-transparent;
+  }
+
+  /* Glass Effect */
+  .glass {
+    @apply bg-white bg-opacity-5 backdrop-blur-md border border-white border-opacity-10;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+
+  .animation-delay-600 {
+    animation-delay: 600ms;
+  }
+}
+
+/* Custom animations for beat cards */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Audio player custom styles */
+wave {
+  overflow: hidden !important;
+}
+
+/* Hide default audio controls */
+audio {
+  display: none;
+}
+
+/* Selection styles */
+::selection {
+  @apply bg-meckury-primary text-white;
+}
+
+::-moz-selection {
+  @apply bg-meckury-primary text-white;
+}
