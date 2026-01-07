@@ -61,6 +61,14 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/songs"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
+                  Songs
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/portfolio"
                   className="text-text-secondary hover:text-white transition-colors text-sm"
                 >
@@ -92,6 +100,14 @@ export default function Footer() {
             <ul className="space-y-2">
               <li>
                 <Link
+                  href="/licenses"
+                  className="text-text-secondary hover:text-white transition-colors text-sm"
+                >
+                  License Agreement
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/terms"
                   className="text-text-secondary hover:text-white transition-colors text-sm"
                 >
@@ -104,22 +120,6 @@ export default function Footer() {
                   className="text-text-secondary hover:text-white transition-colors text-sm"
                 >
                   Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/licenses"
-                  className="text-text-secondary hover:text-white transition-colors text-sm"
-                >
-                  License Agreement
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/refund"
-                  className="text-text-secondary hover:text-white transition-colors text-sm"
-                >
-                  Refund Policy
                 </Link>
               </li>
             </ul>
