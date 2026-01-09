@@ -1,10 +1,12 @@
+// app/admin/beats/page.tsx - Updated version
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Upload, Plus, Edit, Trash2, Eye } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, RefreshCw, Music, TrendingUp } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import BeatUploadForm from '@/components/BeatUploadForm'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -12,8 +14,10 @@ export default function AdminBeatsPage() {
   const router = useRouter()
   const [beats, setBeats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'active' | 'inactive' | 'sold'>('all')
 
   useEffect(() => {
     checkAdmin()
@@ -56,11 +60,17 @@ export default function AdminBeatsPage() {
       toast.error('Failed to load beats')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
+  const handleRefresh = () => {
+    setRefreshing(true)
+    fetchBeats()
+  }
+
   const handleDelete = async (beatId: string) => {
-    if (!confirm('Are you sure you want to delete this beat?')) return
+    if (!confirm('Are you sure you want to delete this beat? This action cannot be undone.')) return
 
     try {
       const { error } = await supabase
@@ -78,6 +88,55 @@ export default function AdminBeatsPage() {
     }
   }
 
+  const toggleActive = async (beatId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('beats')
+        .update({ active: !currentStatus })
+        .eq('id', beatId)
+
+      if (error) throw error
+
+      toast.success(`Beat ${currentStatus ? 'deactivated' : 'activated'}`)
+      fetchBeats()
+    } catch (error) {
+      console.error('Error toggling beat status:', error)
+      toast.error('Failed to update beat')
+    }
+  }
+
+  const toggleFeatured = async (beatId: string, currentStatus: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('beats')
+        .update({ featured: !currentStatus })
+        .eq('id', beatId)
+
+      if (error) throw error
+
+      toast.success(`Beat ${currentStatus ? 'removed from' : 'added to'} featured`)
+      fetchBeats()
+    } catch (error) {
+      console.error('Error toggling featured status:', error)
+      toast.error('Failed to update beat')
+    }
+  }
+
+  const filteredBeats = beats.filter(beat => {
+    if (filter === 'active') return beat.active
+    if (filter === 'inactive') return !beat.active
+    if (filter === 'sold') return beat.exclusive_sold
+    return true
+  })
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    }).format(price)
+  }
+
   if (!isAdmin || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -93,67 +152,176 @@ export default function AdminBeatsPage() {
       <div className="pt-32 pb-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="flex items-center justify-between mb-12">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-12">
             <div>
               <h1 className="text-5xl font-display font-bold text-white mb-2">
                 Manage Beats
               </h1>
               <p className="text-text-secondary text-lg">
-                Upload and manage your beat library
+                Upload, edit, and manage your beat library
               </p>
             </div>
             <button
               onClick={() => setShowUploadForm(true)}
-              className="btn-primary flex items-center space-x-2"
+              className="btn-primary flex items-center justify-center space-x-2 sm:w-auto w-full"
             >
               <Plus className="w-5 h-5" />
-              <span>Upload Beat</span>
+              <span>Upload New Beat</span>
+            </button>
+          </div>
+
+          {/* Stats & Filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div 
+              className={`card cursor-pointer transition-all ${filter === 'all' ? 'ring-2 ring-meckury-primary' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-secondary text-sm">Total Beats</p>
+                  <p className="text-3xl font-bold text-white">{beats.length}</p>
+                </div>
+                <Music className="w-8 h-8 text-meckury-primary" />
+              </div>
+            </div>
+
+            <div 
+              className={`card cursor-pointer transition-all ${filter === 'active' ? 'ring-2 ring-meckury-success' : ''}`}
+              onClick={() => setFilter('active')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-secondary text-sm">Active</p>
+                  <p className="text-3xl font-bold text-white">
+                    {beats.filter(b => b.active).length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-meckury-success bg-opacity-20 rounded-full flex items-center justify-center">
+                  <span className="w-3 h-3 bg-meckury-success rounded-full"></span>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              className={`card cursor-pointer transition-all ${filter === 'sold' ? 'ring-2 ring-meckury-accent' : ''}`}
+              onClick={() => setFilter('sold')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-secondary text-sm">Exclusive Sold</p>
+                  <p className="text-3xl font-bold text-white">
+                    {beats.filter(b => b.exclusive_sold).length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-meckury-accent bg-opacity-20 rounded-full flex items-center justify-center">
+                  <span className="text-meckury-accent font-bold">₦</span>
+                </div>
+              </div>
+            </div>
+
+            <div 
+              className={`card cursor-pointer transition-all ${filter === 'inactive' ? 'ring-2 ring-meckury-danger' : ''}`}
+              onClick={() => setFilter('inactive')}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-text-secondary text-sm">Inactive</p>
+                  <p className="text-3xl font-bold text-white">
+                    {beats.filter(b => !b.active).length}
+                  </p>
+                </div>
+                <div className="w-8 h-8 bg-meckury-danger bg-opacity-20 rounded-full flex items-center justify-center">
+                  <span className="w-3 h-3 bg-meckury-danger rounded-full"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+            <div className="flex items-center space-x-2 text-text-secondary">
+              <span>Showing {filteredBeats.length} beats</span>
+              {filter !== 'all' && (
+                <button
+                  onClick={() => setFilter('all')}
+                  className="text-meckury-primary hover:text-meckury-accent text-sm"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="btn-outline flex items-center justify-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
             </button>
           </div>
 
           {/* Beats List */}
-          {beats.length === 0 ? (
+          {filteredBeats.length === 0 ? (
             <div className="card text-center py-12">
-              <Upload className="w-16 h-16 text-meckury-mediumGray mx-auto mb-4" />
+              <Music className="w-16 h-16 text-meckury-mediumGray mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">
-                No beats uploaded yet
+                {filter === 'all' ? 'No beats uploaded yet' : 'No beats found'}
               </h3>
               <p className="text-text-secondary mb-6">
-                Upload your first beat to get started
+                {filter === 'all' 
+                  ? 'Upload your first beat to get started'
+                  : `No ${filter} beats found. Try a different filter.`
+                }
               </p>
-              <button
-                onClick={() => setShowUploadForm(true)}
-                className="btn-primary inline-flex items-center"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Upload Beat
-              </button>
+              {filter === 'all' ? (
+                <button
+                  onClick={() => setShowUploadForm(true)}
+                  className="btn-primary inline-flex items-center"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Upload First Beat
+                </button>
+              ) : (
+                <button
+                  onClick={() => setFilter('all')}
+                  className="btn-primary"
+                >
+                  View All Beats
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
-              {beats.map((beat) => (
-                <div key={beat.id} className="card">
-                  <div className="flex items-start space-x-6">
-                    {/* Cover Art */}
-                    <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-background-elevated">
-                      {beat.cover_art_url ? (
+              {filteredBeats.map((beat) => (
+                <div key={beat.id} className="card hover:shadow-glow transition-all">
+                  <div className="flex flex-col md:flex-row md:items-start gap-6">
+                    {/* Cover Art & Quick Actions */}
+                    <div className="flex-shrink-0">
+                      <div className="w-32 h-32 rounded-lg overflow-hidden bg-background-elevated relative group">
                         <img
                           src={beat.cover_art_url}
                           alt={beat.title}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-3xl">
-                          🎵
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                          <a
+                            href={`/beats/${beat.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-10 h-10 bg-meckury-primary rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all"
+                            title="View on site"
+                          >
+                            <Eye className="w-5 h-5 text-white" />
+                          </a>
                         </div>
-                      )}
+                      </div>
                     </div>
 
                     {/* Beat Info */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="text-xl font-bold text-white mb-1">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-2xl font-bold text-white mb-1 truncate">
                             {beat.title}
                           </h3>
                           {beat.type_beat && (
@@ -161,90 +329,117 @@ export default function AdminBeatsPage() {
                               {beat.type_beat}
                             </p>
                           )}
-                          <div className="flex items-center space-x-4 text-text-muted text-sm">
-                            {beat.bpm && <span>{beat.bpm} BPM</span>}
+                          <div className="flex flex-wrap items-center gap-2 text-text-muted text-sm mb-3">
+                            {beat.bpm && (
+                              <span className="px-2 py-1 bg-background-elevated rounded">
+                                {beat.bpm} BPM
+                              </span>
+                            )}
                             {beat.key && (
-                              <>
-                                <span>•</span>
-                                <span>{beat.key}</span>
-                              </>
+                              <span className="px-2 py-1 bg-background-elevated rounded">
+                                {beat.key}
+                              </span>
                             )}
                             {beat.genre && (
-                              <>
-                                <span>•</span>
-                                <span>{beat.genre}</span>
-                              </>
+                              <span className="px-2 py-1 bg-background-elevated rounded">
+                                {beat.genre}
+                              </span>
+                            )}
+                            {beat.mood && (
+                              <span className="px-2 py-1 bg-background-elevated rounded">
+                                {beat.mood}
+                              </span>
                             )}
                           </div>
                         </div>
 
-                        {/* Actions */}
+                        {/* Quick Actions */}
                         <div className="flex items-center space-x-2">
-                          <a
-                            href={`/beats/${beat.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-text-secondary hover:text-meckury-primary transition-colors"
-                            title="View"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </a>
                           <button
-                            onClick={() => {
-                              toast('Edit feature coming soon')
-                            }}
-                            className="p-2 text-text-secondary hover:text-meckury-accent transition-colors"
-                            title="Edit"
+                            onClick={() => toggleActive(beat.id, beat.active)}
+                            className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                              beat.active
+                                ? 'bg-meckury-success bg-opacity-20 text-meckury-success hover:bg-opacity-30'
+                                : 'bg-meckury-danger bg-opacity-20 text-meckury-danger hover:bg-opacity-30'
+                            }`}
                           >
-                            <Edit className="w-5 h-5" />
+                            {beat.active ? 'Active' : 'Inactive'}
                           </button>
                           <button
-                            onClick={() => handleDelete(beat.id)}
-                            className="p-2 text-text-secondary hover:text-meckury-danger transition-colors"
-                            title="Delete"
+                            onClick={() => toggleFeatured(beat.id, beat.featured)}
+                            className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${
+                              beat.featured
+                                ? 'bg-meckury-primary bg-opacity-20 text-meckury-primary hover:bg-opacity-30'
+                                : 'bg-meckury-mediumGray text-text-secondary hover:bg-opacity-30'
+                            }`}
                           >
-                            <Trash2 className="w-5 h-5" />
+                            {beat.featured ? 'Featured' : 'Feature'}
                           </button>
                         </div>
                       </div>
 
-                      {/* Stats */}
-                      <div className="mt-4 flex items-center space-x-6 text-sm">
-                        <div>
-                          <span className="text-text-muted">Plays:</span>
-                          <span className="text-white font-semibold ml-2">
-                            {beat.play_count}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted">Leases:</span>
-                          <span className="text-white font-semibold ml-2">
-                            {beat.lease_count}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-text-muted">Status:</span>
-                          <span
-                            className={`ml-2 font-semibold ${
-                              beat.exclusive_sold
-                                ? 'text-meckury-accent'
-                                : beat.active
-                                ? 'text-meckury-success'
-                                : 'text-text-muted'
-                            }`}
-                          >
-                            {beat.exclusive_sold
-                              ? 'Exclusive Sold'
-                              : beat.active
-                              ? 'Active'
-                              : 'Inactive'}
-                          </span>
-                        </div>
-                        {beat.featured && (
-                          <div>
-                            <span className="badge badge-primary">Featured</span>
+                      {/* Stats & Pricing */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                        <div className="p-3 bg-background-elevated rounded-lg">
+                          <p className="text-text-muted text-xs mb-1">Plays</p>
+                          <div className="flex items-center">
+                            <TrendingUp className="w-4 h-4 text-meckury-primary mr-2" />
+                            <p className="text-white font-bold text-lg">{beat.play_count || 0}</p>
                           </div>
-                        )}
+                        </div>
+                        <div className="p-3 bg-background-elevated rounded-lg">
+                          <p className="text-text-muted text-xs mb-1">Leases Sold</p>
+                          <p className="text-white font-bold text-lg">{beat.lease_count || 0}</p>
+                        </div>
+                        <div className="p-3 bg-background-elevated rounded-lg">
+                          <p className="text-text-muted text-xs mb-1">Pricing</p>
+                          <div className="flex items-center space-x-2">
+                            <p className="text-meckury-primary font-bold">
+                              {formatPrice(beat.lease_price)}
+                            </p>
+                            {!beat.exclusive_sold && (
+                              <p className="text-meckury-accent font-bold">
+                                {formatPrice(beat.exclusive_price)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detailed Actions */}
+                      <div className="flex flex-wrap items-center justify-between pt-4 border-t border-meckury-mediumGray gap-3">
+                        <div className="flex items-center space-x-3">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            beat.exclusive_sold
+                              ? 'bg-meckury-accent bg-opacity-20 text-meckury-accent'
+                              : 'bg-meckury-success bg-opacity-20 text-meckury-success'
+                          }`}>
+                            {beat.exclusive_sold ? 'Exclusive Sold' : 'Exclusive Available'}
+                          </span>
+                          <span className="text-text-muted text-sm">
+                            Created {new Date(beat.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              toast('Edit feature coming soon. For now, you can edit directly in Supabase.')
+                            }}
+                            className="btn-outline flex items-center space-x-1 px-3 py-1.5 text-sm"
+                            title="Edit (coming soon)"
+                          >
+                            <Edit className="w-4 h-4" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(beat.id)}
+                            className="btn-outline border-meckury-danger text-meckury-danger hover:bg-meckury-danger hover:text-white flex items-center space-x-1 px-3 py-1.5 text-sm"
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -255,54 +450,15 @@ export default function AdminBeatsPage() {
         </div>
       </div>
 
-      {/* Upload Form Modal - Placeholder */}
+      {/* Upload Form */}
       {showUploadForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-75">
-          <div className="bg-background-card rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto custom-scrollbar p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-3xl font-bold text-white">Upload Beat</h2>
-              <button
-                onClick={() => setShowUploadForm(false)}
-                className="text-text-muted hover:text-white transition-colors text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="text-center py-12">
-              <Upload className="w-16 h-16 text-meckury-primary mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">
-                Upload Form Coming Soon
-              </h3>
-              <p className="text-text-secondary mb-6">
-                For now, you can upload beats directly via Supabase dashboard:
-              </p>
-              <div className="text-left max-w-2xl mx-auto space-y-4 text-text-secondary text-sm">
-                <p><strong className="text-white">1.</strong> Go to Supabase Dashboard → Storage</p>
-                <p><strong className="text-white">2.</strong> Upload files to appropriate buckets:</p>
-                <ul className="list-disc list-inside ml-4 space-y-1">
-                  <li>Cover art → <code className="text-meckury-primary">beat-covers</code></li>
-                  <li>MP3 file → <code className="text-meckury-primary">beat-audio</code></li>
-                  <li>WAV file → <code className="text-meckury-primary">beat-audio</code></li>
-                </ul>
-                <p><strong className="text-white">3.</strong> Go to Table Editor → <code className="text-meckury-primary">beats</code> table</p>
-                <p><strong className="text-white">4.</strong> Click "Insert row" and fill in:</p>
-                <ul className="list-disc list-inside ml-4 space-y-1">
-                  <li>title, slug, cover_art_url, mp3_url, wav_url</li>
-                  <li>bpm, key, genre, mood, type_beat</li>
-                  <li>lease_price (₦20,000), exclusive_price (₦80,000)</li>
-                  <li>active = true, featured = false</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => setShowUploadForm(false)}
-                className="btn-primary mt-8"
-              >
-                Got It
-              </button>
-            </div>
-          </div>
-        </div>
+        <BeatUploadForm
+          onClose={() => setShowUploadForm(false)}
+          onSuccess={() => {
+            fetchBeats()
+            toast.success('Beat uploaded successfully!')
+          }}
+        />
       )}
 
       <Footer />
