@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Inter, Space_Grotesk } from 'next/font/google'
+import { CartProvider } from '@/context/CartContext'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 
@@ -66,8 +67,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <head>
+        {/* Add viewport meta tag for mobile responsiveness */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+      </head>
       <body className="min-h-screen bg-background">
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
         <Toaster
           position="top-right"
           toastOptions={{
