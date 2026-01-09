@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Play, Pause, TrendingUp, Lock, ExternalLink } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import toast from 'react-hot-toast'
 
 interface BeatCardProps {
   beat: {
@@ -25,6 +27,8 @@ interface BeatCardProps {
 export default function BeatCard({ beat }: BeatCardProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
+  const [localPlayCount, setLocalPlayCount] = useState(beat.play_count)
+  const [hasPlayed, setHasPlayed] = useState(false) // Track if play has been counted
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
@@ -34,8 +38,24 @@ export default function BeatCard({ beat }: BeatCardProps) {
       audio.crossOrigin = 'anonymous'
       audio.volume = 0.7 // 70% volume for preview
       
+      audio.addEventListener('loadedmetadata', () => {
+        console.log('Audio loaded for:', beat.title)
+      })
+      
+      audio.addEventListener('playing', () => {
+        console.log('Audio started playing for:', beat.title)
+        if (!hasPlayed) {
+          incrementPlayCount()
+        }
+      })
+      
       audio.addEventListener('ended', () => {
         setIsPlaying(false)
+      })
+      
+      audio.addEventListener('error', (e) => {
+        console.error('Audio error for', beat.title, ':', e)
+        toast.error('Failed to load audio preview')
       })
       
       audioRef.current = audio
@@ -48,7 +68,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
         audioRef.current.src = ''
       }
     }
-  }, [beat.mp3_url])
+  }, [beat.mp3_url, beat.title, hasPlayed])
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -58,22 +78,57 @@ export default function BeatCard({ beat }: BeatCardProps) {
     }).format(price)
   }
 
-  const handlePlayPause = (e: React.MouseEvent) => {
+  const incrementPlayCount = async () => {
+    try {
+      console.log('Incrementing play count for beat:', beat.id)
+      const { error } = await supabase.rpc('increment_play_count', { 
+        beat_id: beat.id 
+      })
+      
+      if (error) {
+        console.error('Error incrementing play count:', error)
+        throw error
+      }
+      
+      console.log('Play count incremented successfully for beat:', beat.id)
+      setLocalPlayCount(prev => prev + 1)
+      setHasPlayed(true)
+    } catch (error) {
+      console.error('Failed to increment play count:', error)
+      // Don't show toast to avoid interrupting user experience
+    }
+  }
+
+  const handlePlayPause = async (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     
     const audio = audioRef.current
-    if (!audio) return
+    if (!audio) {
+      console.error('Audio element not initialized for:', beat.title)
+      toast.error('Audio not loaded yet')
+      return
+    }
 
-    if (isPlaying) {
-      audio.pause()
-      setIsPlaying(false)
-    } else {
-      audio.play()
-        .then(() => setIsPlaying(true))
-        .catch((error) => {
-          console.error('Playback error:', error)
-        })
+    try {
+      if (isPlaying) {
+        audio.pause()
+        setIsPlaying(false)
+      } else {
+        // Reset audio to start if it ended previously
+        if (audio.currentTime >= audio.duration - 1) {
+          audio.currentTime = 0
+        }
+        
+        await audio.play()
+        setIsPlaying(true)
+        
+        // Note: The 'playing' event listener will handle play count increment
+        // This ensures we count plays even if user skips around in the audio
+      }
+    } catch (error) {
+      console.error('Playback error for', beat.title, ':', error)
+      toast.error('Failed to play audio preview')
     }
   }
 
@@ -92,7 +147,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
           className="object-cover transition-transform duration-300 group-hover:scale-110"
         />
 
-        {/* Always Visible Play Button - FIXED: No overlay covering button */}
+        {/* Always Visible Play Button */}
         <div className="absolute inset-0 flex items-center justify-center">
           <button
             onClick={handlePlayPause}
@@ -101,6 +156,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
                 ? 'bg-red-600 hover:bg-red-700 shadow-red-500/50'
                 : 'bg-black/60 hover:bg-black/70 shadow-black/50'
             }`}
+            aria-label={isPlaying ? `Pause ${beat.title}` : `Play ${beat.title}`}
           >
             {isPlaying ? (
               <Pause className="w-8 h-8 text-white" fill="white" />
@@ -133,11 +189,11 @@ export default function BeatCard({ beat }: BeatCardProps) {
           </div>
         )}
 
-        {/* Play Count */}
-        {beat.play_count > 0 && (
+        {/* Play Count - Using local play count state */}
+        {localPlayCount > 0 && (
           <div className="absolute top-3 left-3 bg-black bg-opacity-60 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1 z-20">
             <TrendingUp className="w-3 h-3" />
-            <span>{beat.play_count} plays</span>
+            <span>{localPlayCount} {localPlayCount === 1 ? 'play' : 'plays'}</span>
           </div>
         )}
       </div>
