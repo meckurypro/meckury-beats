@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import CartButton from '@/components/CartButton'
 import { usePathname } from 'next/navigation'
-import { Menu, X, ShoppingBag, User, LogOut, Settings } from 'lucide-react'
+import { Menu, X, User, LogOut, Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export default function Navbar() {
@@ -105,14 +106,11 @@ export default function Navbar() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-4">
+            {/* Cart Button */}
+            <CartButton />
+            
             {user ? (
               <>
-                <Link
-                  href="/cart"
-                  className="p-2 text-text-secondary hover:text-meckury-primary transition-colors relative"
-                >
-                  <ShoppingBag className="w-5 h-5" />
-                </Link>
                 {isAdmin && (
                   <Link
                     href="/admin"
@@ -183,16 +181,22 @@ export default function Navbar() {
             ))}
             
             <div className="pt-4 border-t border-meckury-mediumGray space-y-4">
+              {/* Mobile Cart Button (simplified) */}
+              <Link
+                href="/cart"
+                onClick={() => setIsMenuOpen(false)}
+                className="flex items-center space-x-2 py-2 text-text-secondary hover:text-white transition-colors"
+              >
+                <div className="relative">
+                  <span className="absolute -top-1 -right-1 bg-meckury-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                    0 {/* You can make this dynamic later */}
+                  </span>
+                </div>
+                <span>Cart</span>
+              </Link>
+              
               {user ? (
                 <>
-                  <Link
-                    href="/cart"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center space-x-2 py-2 text-text-secondary hover:text-white transition-colors"
-                  >
-                    <ShoppingBag className="w-5 h-5" />
-                    <span>Cart</span>
-                  </Link>
                   {isAdmin && (
                     <Link
                       href="/admin"
