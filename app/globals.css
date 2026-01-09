@@ -6,7 +6,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-color: theme('colors.meckury.mediumGray');
   }
   
   body {
