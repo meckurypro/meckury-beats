@@ -2,18 +2,32 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Play, TrendingUp, Music, Zap, ArrowRight } from 'lucide-react'
+import { Play, Music, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import BeatCard from '@/components/BeatCard'
 import { supabase } from '@/lib/supabase'
 
+const HERO_IMAGES = [
+  'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?q=80&w=2070',
+  'https://images.unsplash.com/photo-1519892300165-cb5542fb47c7?q=80&w=2070',
+  'https://images.unsplash.com/photo-1598653222000-6b7b7a552625?q=80&w=2070',
+]
+
 export default function HomePage() {
   const [featuredBeats, setFeaturedBeats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentSlide, setCurrentSlide] = useState(0)
 
   useEffect(() => {
     fetchFeaturedBeats()
+    
+    // Auto-play slider
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length)
+    }, 5000)
+    
+    return () => clearInterval(interval)
   }, [])
 
   const fetchFeaturedBeats = async () => {
@@ -35,76 +49,98 @@ export default function HomePage() {
     }
   }
 
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % HERO_IMAGES.length)
+  }
+
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length)
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 bg-gradient-to-br from-meckury-dark via-meckury-darkGray to-meckury-dark">
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-meckury-primary rounded-full blur-3xl animate-pulse-slow"></div>
-            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-meckury-secondary rounded-full blur-3xl animate-pulse-slow animation-delay-400"></div>
-          </div>
+      {/* Hero Section with Slider */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background Image Slider */}
+        <div className="absolute inset-0">
+          {HERO_IMAGES.map((image, index) => (
+            <div
+              key={index}
+              className={`absolute inset-0 transition-opacity duration-1000 ${
+                index === currentSlide ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <img
+                src={image}
+                alt={`Studio ${index + 1}`}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80"></div>
+            </div>
+          ))}
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Producer Tag */}
-          <div className="inline-flex items-center space-x-2 bg-meckury-primary bg-opacity-10 border border-meckury-primary rounded-full px-6 py-3 mb-8 animate-fade-in">
-            <Zap className="w-5 h-5 text-meckury-primary" />
-            <span className="text-meckury-primary font-semibold">
-              Official Producer Tag
-            </span>
-          </div>
+        {/* Slider Controls */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all"
+        >
+          <ChevronLeft className="w-6 h-6 text-white" />
+        </button>
+        <button
+          onClick={nextSlide}
+          className="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-12 h-12 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition-all"
+        >
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
 
+        {/* Slide Indicators */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20 flex space-x-2">
+          {HERO_IMAGES.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentSlide(index)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                index === currentSlide ? 'bg-red-500 w-8' : 'bg-white/50'
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           {/* Main Heading */}
-          <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-bold mb-6 animate-slide-up">
+          <h1 className="text-6xl sm:text-7xl md:text-8xl font-display font-bold mb-6">
             <span className="block text-white">DANKE</span>
-            <span className="block gradient-text">MECKURY</span>
+            <span className="block bg-gradient-to-r from-red-500 via-red-600 to-blue-500 bg-clip-text text-transparent">
+              MECKURY
+            </span>
           </h1>
 
-          <p className="text-xl sm:text-2xl text-text-secondary max-w-3xl mx-auto mb-8 animate-slide-up animation-delay-200">
+          <p className="text-xl sm:text-2xl text-gray-200 max-w-3xl mx-auto mb-10">
             Premium beats & music production by Meckury
             <br />
-            <span className="text-meckury-primary font-semibold">
-              @ CovaStoris
-            </span>
+            <span className="text-red-500 font-semibold">@ CovaStoris</span>
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-12 animate-slide-up animation-delay-400">
-            <Link href="/beats" className="btn-primary flex items-center space-x-2">
+          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <Link 
+              href="/beats" 
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-8 rounded-lg transition-all flex items-center space-x-2 shadow-lg shadow-red-500/50"
+            >
               <Music className="w-5 h-5" />
               <span>Browse Beats</span>
             </Link>
-            <Link href="/studio" className="btn-outline flex items-center space-x-2">
+            <Link 
+              href="/studio" 
+              className="border-2 border-white/30 backdrop-blur-sm bg-white/10 hover:bg-white/20 text-white font-semibold py-4 px-8 rounded-lg transition-all flex items-center space-x-2"
+            >
               <Play className="w-5 h-5" />
               <span>Book Studio Session</span>
             </Link>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-8 max-w-2xl mx-auto mt-16">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-meckury-primary mb-2">20+</div>
-              <div className="text-text-secondary text-sm">Premium Beats</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-meckury-accent mb-2">₦20K</div>
-              <div className="text-text-secondary text-sm">Starting Price</div>
-            </div>
-            <div className="text-center col-span-2 md:col-span-1">
-              <div className="text-4xl font-bold text-meckury-secondary mb-2">24/7</div>
-              <div className="text-text-secondary text-sm">Instant Delivery</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 border-2 border-meckury-primary rounded-full flex items-start justify-center p-2">
-            <div className="w-1 h-3 bg-meckury-primary rounded-full"></div>
           </div>
         </div>
       </section>
@@ -123,7 +159,7 @@ export default function HomePage() {
             </div>
             <Link
               href="/beats"
-              className="hidden sm:flex items-center space-x-2 text-meckury-primary hover:text-meckury-accent transition-colors"
+              className="hidden sm:flex items-center space-x-2 text-red-500 hover:text-red-400 transition-colors"
             >
               <span className="font-semibold">View All</span>
               <ArrowRight className="w-5 h-5" />
@@ -155,7 +191,7 @@ export default function HomePage() {
           )}
 
           <div className="text-center mt-12 sm:hidden">
-            <Link href="/beats" className="btn-primary inline-flex items-center space-x-2">
+            <Link href="/beats" className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-all inline-flex items-center space-x-2">
               <span>View All Beats</span>
               <ArrowRight className="w-5 h-5" />
             </Link>
@@ -176,42 +212,39 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="card text-center hover:shadow-glow transition-all">
-              <div className="w-16 h-16 bg-meckury-primary bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <TrendingUp className="w-8 h-8 text-meckury-primary" />
+            <div className="card text-center hover:shadow-lg hover:shadow-red-500/20 transition-all">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-500/50">
+                <Music className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-white mb-3">
                 Premium Quality
               </h3>
               <p className="text-text-secondary">
-                Professional mixing, mastering, and production ready for
-                commercial use
+                Professional mixing, mastering, and production ready for commercial use
               </p>
             </div>
 
-            <div className="card text-center hover:shadow-glow transition-all">
-              <div className="w-16 h-16 bg-meckury-accent bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Zap className="w-8 h-8 text-meckury-accent" />
+            <div className="card text-center hover:shadow-lg hover:shadow-blue-500/20 transition-all">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-500/50">
+                <Play className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-white mb-3">
                 Instant Delivery
               </h3>
               <p className="text-text-secondary">
-                Download MP3 and WAV files immediately after payment. Stems
-                prepared within 48 hours
+                Download MP3 and WAV files immediately after payment. Stems prepared within 48 hours
               </p>
             </div>
 
-            <div className="card text-center hover:shadow-glow transition-all">
-              <div className="w-16 h-16 bg-meckury-secondary bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Music className="w-8 h-8 text-meckury-secondary" />
+            <div className="card text-center hover:shadow-lg hover:shadow-red-500/20 transition-all">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-red-500/50">
+                <Music className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-white mb-3">
                 Flexible Licensing
               </h3>
               <p className="text-text-secondary">
-                Choose between affordable leases or exclusive rights with stems
-                included
+                Choose between affordable leases or exclusive rights with stems included
               </p>
             </div>
           </div>
@@ -219,24 +252,24 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-meckury-primary to-meckury-accent">
+      <section className="py-20 bg-gradient-to-br from-red-600 via-red-700 to-blue-600">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-4xl font-display font-bold text-white mb-6">
             Ready to Create Your Next Hit?
           </h2>
-          <p className="text-xl text-white text-opacity-90 mb-8">
+          <p className="text-xl text-white/90 mb-8">
             Book a studio session at CovaStoris or browse our beat collection
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <Link
               href="/studio"
-              className="bg-white text-meckury-primary hover:bg-opacity-90 font-semibold py-4 px-8 rounded-lg transition-all"
+              className="bg-white text-red-600 hover:bg-gray-100 font-semibold py-4 px-8 rounded-lg transition-all shadow-lg"
             >
               Book Studio Session
             </Link>
             <Link
               href="/beats"
-              className="border-2 border-white text-white hover:bg-white hover:text-meckury-primary font-semibold py-4 px-8 rounded-lg transition-all"
+              className="border-2 border-white text-white hover:bg-white hover:text-red-600 font-semibold py-4 px-8 rounded-lg transition-all"
             >
               Browse Beats
             </Link>
