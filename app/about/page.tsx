@@ -19,7 +19,7 @@ export default function AboutPage() {
               <span className="block gradient-text mt-2">Meckury</span>
             </h1>
             <p className="text-text-secondary text-xl">
-              Producer • Beat Maker • Sound Engineer
+              Producer • Singer • Songwriter • Composer
             </p>
           </div>
 
@@ -32,13 +32,13 @@ export default function AboutPage() {
               </h2>
               <div className="space-y-4 text-text-secondary leading-relaxed">
                 <p>
-                  Meckury is a Nigerian music producer and beat maker based in Lagos, creating beats that blend Afrobeats, Trap, Drill, and more. With years of experience in music production, Meckury has developed a unique sound that resonates with artists across Nigeria and beyond.
+                  Meckury is a Nigerian music producer, beat maker, singer, songwriter, and music composer currently based in Enugu. With over 10 years of experience in music production, Meckury has developed a versatile sound that spans multiple genres including Afrobeats, Amapiano, Afrogospel, Drill, and more.
                 </p>
                 <p>
-                  Operating from CovaStoris studio, Meckury has worked with numerous artists, helping them bring their musical visions to life through professional production, mixing, and mastering services.
+                  Operating from CovaStoris studio in Lagos, Meckury has worked with numerous artists across Nigeria, helping them bring their musical visions to life through professional production, mixing, and mastering services.
                 </p>
                 <p>
-                  The signature "Danke Meckury" producer tag has become synonymous with quality beats that hit hard and inspire creativity. From melodic Afrobeats to aggressive drill beats, Meckury's versatility makes every project unique.
+                  The signature "Danke Meckury" producer tag has become synonymous with quality beats that resonate with audiences. Whether it's melodic Afrobeats, energetic Amapiano, soulful Afrogospel, or hard-hitting Drill, Meckury's versatility and creativity make every project unique.
                 </p>
               </div>
             </div>
@@ -57,8 +57,8 @@ export default function AboutPage() {
                 <div className="w-12 h-12 bg-meckury-accent bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Award className="w-6 h-6 text-meckury-accent" />
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">Years</div>
-                <div className="text-text-secondary text-sm">Of Experience</div>
+                <div className="text-3xl font-bold text-white mb-1">10+</div>
+                <div className="text-text-secondary text-sm">Years Experience</div>
               </div>
 
               <div className="card text-center">
@@ -79,14 +79,14 @@ export default function AboutPage() {
             </div>
 
             {/* CovaStoris */}
-            <div className="card bg-gradient-to-br from-meckury-primary to-meckury-accent">
+            <div className="card bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700">
               <h2 className="text-3xl font-bold text-white mb-4">
                 CovaStoris Studio
               </h2>
-              <p className="text-white text-opacity-90 mb-6 leading-relaxed">
+              <p className="text-gray-200 mb-6 leading-relaxed">
                 CovaStoris is Meckury's professional recording studio based in Lagos, Nigeria. Equipped with industry-standard gear and software, CovaStoris provides a creative environment where artists can bring their music to life. From beat production to full song recording and mixing, CovaStoris is where the magic happens.
               </p>
-              <Link href="/studio" className="btn-outline border-white text-white hover:bg-white hover:text-meckury-primary">
+              <Link href="/studio" className="inline-block bg-white text-gray-900 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-all">
                 Book a Session
               </Link>
             </div>
