@@ -92,15 +92,15 @@ export default function BeatCard({ beat }: BeatCardProps) {
           className="object-cover transition-transform duration-300 group-hover:scale-110"
         />
 
-        {/* Overlay on Hover */}
-        <div
-          className={`absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center transition-opacity duration-300 ${
-            isHovered || isPlaying ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
+        {/* Always Visible Play Button */}
+        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
           <button
             onClick={handlePlayPause}
-            className="w-16 h-16 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg shadow-red-500/50"
+            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg ${
+              isPlaying || isHovered
+                ? 'bg-red-700 hover:bg-red-800 shadow-red-500/50'
+                : 'bg-black/70 hover:bg-black/80 shadow-black/50'
+            }`}
           >
             {isPlaying ? (
               <Pause className="w-8 h-8 text-white" fill="white" />
@@ -109,6 +109,13 @@ export default function BeatCard({ beat }: BeatCardProps) {
             )}
           </button>
         </div>
+
+        {/* Darker Overlay on Hover */}
+        <div
+          className={`absolute inset-0 bg-black transition-opacity duration-300 ${
+            isHovered ? 'opacity-40' : 'opacity-0'
+          }`}
+        />
 
         {/* Playing Indicator */}
         {isPlaying && (
