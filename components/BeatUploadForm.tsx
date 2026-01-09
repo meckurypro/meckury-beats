@@ -1,8 +1,7 @@
-// components/BeatUploadForm.tsx
 'use client'
 
 import { useState } from 'react'
-import { Upload, Music, Loader2, X, Eye, EyeOff } from 'lucide-react'
+import { Upload, Music, Loader2, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -69,6 +68,7 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
   }
 
   const handleFileChange = (type: 'cover' | 'mp3' | 'wav', file: File | null) => {
+    console.log(`File selected for ${type}:`, file?.name, file?.size)
     setFiles(prev => ({ ...prev, [type]: file }))
     
     // Preview for cover image
@@ -82,6 +82,8 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
   }
 
   const validateFiles = () => {
+    console.log('Validating files:', files)
+    
     if (!files.cover) {
       toast.error('Cover art is required')
       return false
@@ -131,6 +133,8 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
     const filePath = `${path}/${fileName}`
 
+    console.log(`Uploading to ${bucket}/${filePath}...`)
+
     const { error, data } = await supabase.storage
       .from(bucket)
       .upload(filePath, file, {
@@ -138,21 +142,34 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
         upsert: false
       })
 
-    if (error) throw error
+    if (error) {
+      console.error('Upload error:', error)
+      throw error
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from(bucket)
       .getPublicUrl(filePath)
 
+    console.log('Upload successful:', publicUrl)
     return publicUrl
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    console.log('Form submitted')
+    console.log('Current files state:', files)
+    
+    if (!formData.title) {
+      toast.error('Beat title is required')
+      return
+    }
+    
     if (!validateFiles()) return
 
     setLoading(true)
+    const loadingToast = toast.loading('Preparing upload...')
 
     try {
       // Check if slug already exists
@@ -164,47 +181,62 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
 
       if (existingBeat) {
         toast.error('A beat with this slug already exists. Please change the title.')
+        setLoading(false)
+        toast.dismiss(loadingToast)
         return
       }
 
       // Upload files
-      toast.loading('Uploading cover art...')
+      toast.loading('Uploading cover art...', { id: loadingToast })
       const coverUrl = await uploadFile(files.cover!, 'beat-covers', 'covers')
       setUploadProgress(prev => ({ ...prev, cover: 100 }))
 
-      toast.loading('Uploading MP3...')
+      toast.loading('Uploading MP3...', { id: loadingToast })
       const mp3Url = await uploadFile(files.mp3!, 'beat-audio', 'mp3')
       setUploadProgress(prev => ({ ...prev, mp3: 100 }))
 
-      toast.loading('Uploading WAV...')
+      toast.loading('Uploading WAV...', { id: loadingToast })
       const wavUrl = await uploadFile(files.wav!, 'beat-audio', 'wav')
       setUploadProgress(prev => ({ ...prev, wav: 100 }))
 
+      toast.loading('Saving beat...', { id: loadingToast })
+
       // Create beat record
       const beatData = {
-        ...formData,
+        title: formData.title,
+        slug: formData.slug,
+        description: formData.description || null,
         bpm: formData.bpm ? parseInt(formData.bpm) : null,
+        key: formData.key || null,
+        genre: formData.genre || null,
+        mood: formData.mood || null,
+        type_beat: formData.type_beat || null,
         lease_price: parseInt(formData.lease_price),
         exclusive_price: parseInt(formData.exclusive_price),
+        featured: formData.featured,
+        active: formData.active,
         cover_art_url: coverUrl,
         mp3_url: mp3Url,
         wav_url: wavUrl,
-        created_at: new Date().toISOString()
       }
+
+      console.log('Inserting beat data:', beatData)
 
       const { error: insertError } = await supabase
         .from('beats')
         .insert(beatData)
 
-      if (insertError) throw insertError
+      if (insertError) {
+        console.error('Insert error:', insertError)
+        throw insertError
+      }
 
-      toast.dismiss()
-      toast.success('Beat uploaded successfully!')
+      toast.success('Beat uploaded successfully!', { id: loadingToast })
       onSuccess()
       onClose()
     } catch (error: any) {
       console.error('Error uploading beat:', error)
-      toast.error(error.message || 'Failed to upload beat')
+      toast.error(error.message || 'Failed to upload beat', { id: loadingToast })
     } finally {
       setLoading(false)
     }
@@ -213,29 +245,29 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
   const FileUpload = ({ 
     type, 
     label, 
-    accept, 
-    required = true 
+    accept 
   }: { 
     type: 'cover' | 'mp3' | 'wav'
     label: string
     accept: string
-    required?: boolean
   }) => (
     <div>
       <label className="block text-sm font-medium text-text-secondary mb-2">
-        {label} {required && '*'}
+        {label} *
       </label>
-      <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-meckury-mediumGray rounded-lg hover:border-meckury-primary transition-colors">
-        <div className="space-y-1 text-center">
-          <div className="flex text-sm text-text-secondary">
-            <label className="relative cursor-pointer rounded-md font-medium text-meckury-primary hover:text-meckury-accent focus-within:outline-none">
+      <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed border-meckury-mediumGray rounded-lg hover:border-red-500 transition-colors">
+        <div className="space-y-1 text-center w-full">
+          <div className="flex text-sm text-text-secondary justify-center">
+            <label className="relative cursor-pointer rounded-md font-medium text-red-500 hover:text-red-400 focus-within:outline-none">
               <span>Upload file</span>
               <input
                 type="file"
                 accept={accept}
-                onChange={(e) => handleFileChange(type, e.target.files?.[0] || null)}
+                onChange={(e) => {
+                  const selectedFile = e.target.files?.[0] || null
+                  handleFileChange(type, selectedFile)
+                }}
                 className="sr-only"
-                required={required}
                 disabled={loading}
               />
             </label>
@@ -246,14 +278,14 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
              type === 'mp3' ? 'MP3 up to 50MB' : 'WAV up to 50MB'}
           </p>
           {files[type] && (
-            <p className="text-xs text-meckury-success mt-2">
-              ✓ {(files[type]!.size / 1024 / 1024).toFixed(2)} MB uploaded
+            <p className="text-xs text-green-500 mt-2 font-semibold">
+              ✓ {files[type]!.name} ({(files[type]!.size / 1024 / 1024).toFixed(2)} MB)
             </p>
           )}
           {uploadProgress[type] > 0 && uploadProgress[type] < 100 && (
             <div className="w-full bg-meckury-mediumGray rounded-full h-2 mt-2">
               <div 
-                className="bg-meckury-primary h-2 rounded-full transition-all duration-300"
+                className="bg-red-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress[type]}%` }}
               ></div>
             </div>
@@ -332,7 +364,7 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
                       <button
                         type="button"
                         onClick={() => setFormData(prev => ({ ...prev, slug: generateSlug(prev.title) }))}
-                        className="text-sm text-meckury-primary hover:text-meckury-accent transition-colors"
+                        className="text-sm text-red-500 hover:text-red-400 transition-colors"
                         disabled={loading}
                       >
                         Refresh
@@ -353,12 +385,12 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
               <FileUpload 
                 type="mp3"
                 label="MP3 File"
-                accept="audio/mpeg,audio/mp3"
+                accept="audio/mpeg,audio/mp3,.mp3"
               />
               <FileUpload 
                 type="wav"
                 label="WAV File"
-                accept="audio/wav,audio/x-wav"
+                accept="audio/wav,audio/x-wav,.wav"
               />
             </div>
 
@@ -367,7 +399,7 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
               <button
                 type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center space-x-2 text-meckury-primary hover:text-meckury-accent transition-colors font-medium"
+                className="flex items-center space-x-2 text-red-500 hover:text-red-400 transition-colors font-medium"
               >
                 {showAdvanced ? (
                   <EyeOff className="w-4 h-4" />
@@ -470,7 +502,7 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
                   />
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-text-secondary mb-2">
                     Description
                   </label>
@@ -478,7 +510,7 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
                     name="description"
                     value={formData.description}
                     onChange={handleInputChange}
-                    className="textarea h-32"
+                    className="textarea h-24"
                     placeholder="Optional beat description..."
                     disabled={loading}
                   />
@@ -566,15 +598,15 @@ export default function BeatUploadForm({ onClose, onSuccess }: BeatUploadFormPro
                 <button
                   type="button"
                   onClick={onClose}
-                  className="btn-outline"
+                  className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all"
                   disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="btn-primary flex items-center justify-center space-x-2 min-w-[120px]"
+                  disabled={loading || !files.cover || !files.mp3 || !files.wav}
+                  className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-8 rounded-lg transition-all flex items-center justify-center space-x-2 min-w-[160px]"
                 >
                   {loading ? (
                     <>
