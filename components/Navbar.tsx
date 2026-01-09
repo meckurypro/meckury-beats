@@ -75,7 +75,7 @@ export default function Navbar() {
             ? 'bg-background-card shadow-lg backdrop-blur-md bg-opacity-95'
             : 'bg-transparent'
         }`}
-        style={{ zIndex: 9999 }}
+        style={{ zIndex: 100 }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
@@ -109,7 +109,7 @@ export default function Navbar() {
             {/* Desktop Actions */}
             <div className="hidden md:flex items-center space-x-4">
               {/* Cart Button */}
-              <div style={{ zIndex: 10000 }}>
+              <div className="relative z-50">
                 <CartButton />
               </div>
               
@@ -143,7 +143,7 @@ export default function Navbar() {
                     className="text-text-secondary hover:text-white font-medium transition-colors"
                   >
                     Sign In
-                </Link>
+                  </Link>
                   <Link href="/auth/signup" className="btn-primary">
                     Get Started
                   </Link>
@@ -154,8 +154,7 @@ export default function Navbar() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-text-secondary hover:text-white transition-colors"
-              style={{ zIndex: 10000 }}
+              className="md:hidden p-2 text-text-secondary hover:text-white transition-colors relative z-50"
             >
               {isMenuOpen ? (
                 <X className="w-6 h-6" />
@@ -170,7 +169,7 @@ export default function Navbar() {
         {isMenuOpen && (
           <div 
             className="md:hidden bg-background-card border-t border-meckury-mediumGray animate-slide-down"
-            style={{ zIndex: 9998 }}
+            style={{ zIndex: 99 }}
           >
             <div className="px-4 py-6 space-y-4">
               {navLinks.map((link) => (
@@ -190,7 +189,7 @@ export default function Navbar() {
               
               <div className="pt-4 border-t border-meckury-mediumGray space-y-4">
                 {/* Mobile Cart Button */}
-                <div className="relative" style={{ zIndex: 9999 }}>
+                <div className="relative z-50">
                   <Link
                     href="/cart"
                     onClick={() => setIsMenuOpen(false)}
