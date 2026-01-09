@@ -142,16 +142,14 @@ export default function CheckoutPage() {
     }).format(price)
   }
 
-  const paystackConfig = {
+  const componentProps = {
     reference: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     email: user?.email || '',
-    amount: amount * 100, // Paystack uses kobo (smallest unit)
+    amount: amount * 100,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-    metadata: {
-      beat_id: beatId,
-      license_type: licenseType,
-      user_id: user?.id,
-    },
+    text: 'Pay with Paystack',
+    onSuccess: handlePaymentSuccess,
+    onClose: handlePaymentClose,
   }
 
   if (loading) {
@@ -306,15 +304,9 @@ export default function CheckoutPage() {
                 {/* Paystack Button */}
                 {!processing ? (
                   <PaystackButton
-                    {...paystackConfig}
-                    text="Pay with Paystack"
-                    onSuccess={handlePaymentSuccess}
-                    onClose={handlePaymentClose}
+                    {...componentProps}
                     className="btn-primary w-full flex items-center justify-center space-x-2"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                    <span>Pay {formatPrice(amount)}</span>
-                  </PaystackButton>
+                  />
                 ) : (
                   <button
                     disabled
