@@ -14,7 +14,7 @@ export default function Footer() {
           <div className="space-y-4">
             <div className="text-2xl font-display font-bold">
               <span className="text-meckury-primary">Meckury</span>
-              <span className="text-white ml-2">Beats</span>
+              <span className="text-white ml-2">Pro</span>
             </div>
             <p className="text-text-secondary text-sm">
               Premium beats & music production by Meckury at CovaStoris.
@@ -156,7 +156,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-meckury-mediumGray">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-text-secondary text-sm">
-              © {currentYear} Meckury. All rights reserved.
+              © {currentYear} Meckury Pro. All rights reserved.
             </p>
             <p className="text-text-secondary text-sm">
               Powered by{' '}
