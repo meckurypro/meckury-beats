@@ -55,7 +55,7 @@ export default function BeatDetailPage() {
     // Create audio element
     const audio = new Audio(beat.mp3_url)
     audio.crossOrigin = 'anonymous'
-    audio.volume = volume
+    audio.volume = 1 // Start at 100%
     audioRef.current = audio
 
     // Event handlers
@@ -93,7 +93,7 @@ export default function BeatDetailPage() {
       audio.pause()
       audio.src = ''
     }
-  }, [beat?.mp3_url, volume])
+  }, [beat?.mp3_url]) // Removed volume from dependencies
 
   const togglePlayPause = () => {
     const audio = audioRef.current
