@@ -111,20 +111,6 @@ export default function HomePage() {
 
         {/* Hero Content */}
         <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          {/* Main Heading */}
-          <h1 className="text-6xl sm:text-7xl md:text-8xl font-display font-bold mb-6">
-            <span className="block text-white">DANKE</span>
-            <span className="block bg-gradient-to-r from-red-500 via-red-600 to-blue-500 bg-clip-text text-transparent">
-              MECKURY
-            </span>
-          </h1>
-
-          <p className="text-xl sm:text-2xl text-gray-200 max-w-3xl mx-auto mb-10">
-            Premium beats & music production by Meckury
-            <br />
-            <span className="text-red-500 font-semibold">@ CovaStoris</span>
-          </p>
-
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
             <Link 
