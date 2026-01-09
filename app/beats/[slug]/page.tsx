@@ -33,7 +33,7 @@ export default function BeatDetailPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [featuredSong, setFeaturedSong] = useState<any>(null)
-  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [volume, setVolume] = useState(1)
@@ -48,92 +48,66 @@ export default function BeatDetailPage() {
     })
   }, [params.slug])
 
+  // Initialize and manage audio element
   useEffect(() => {
-    // Initialize audio element when beat is loaded
-    if (beat && beat.mp3_url && !audioRef) {
-      console.log('Initializing audio with URL:', beat.mp3_url)
-      
-      const audio = new Audio()
-      audio.crossOrigin = 'anonymous' // Enable CORS
-      audio.preload = 'metadata'
-      
-      audio.addEventListener('loadedmetadata', () => {
-        console.log('Audio metadata loaded, duration:', audio.duration)
-        setDuration(audio.duration)
-      })
-      
-      audio.addEventListener('timeupdate', () => {
-        setCurrentTime(audio.currentTime)
-      })
-      
-      audio.addEventListener('canplay', () => {
-        console.log('Audio can play')
-      })
-      
-      audio.addEventListener('ended', () => {
-        console.log('Audio ended')
-        setIsPlaying(false)
-        setCurrentTime(0)
-      })
-      
-      audio.addEventListener('error', (e) => {
-        console.error('Audio error:', e)
-        console.error('Audio error details:', {
-          error: audio.error,
-          code: audio.error?.code,
-          message: audio.error?.message,
-          networkState: audio.networkState,
-          readyState: audio.readyState,
-          src: audio.src
-        })
-        toast.error('Failed to load audio. Check console for details.')
-      })
-      
-      // Set source after all event listeners are attached
-      audio.src = beat.mp3_url
-      audio.volume = volume
-      setAudioRef(audio)
+    if (!beat || !beat.mp3_url) return
+
+    // Create audio element
+    const audio = new Audio(beat.mp3_url)
+    audio.crossOrigin = 'anonymous'
+    audio.volume = volume
+    audioRef.current = audio
+
+    // Event handlers
+    const handleLoadedMetadata = () => {
+      setDuration(audio.duration)
+      console.log('Audio loaded, duration:', audio.duration)
     }
+
+    const handleTimeUpdate = () => {
+      setCurrentTime(audio.currentTime)
+    }
+
+    const handleEnded = () => {
+      setIsPlaying(false)
+      setCurrentTime(0)
+    }
+
+    const handleError = (e: ErrorEvent) => {
+      console.error('Audio error:', e)
+      toast.error('Failed to load audio')
+    }
+
+    // Attach event listeners
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('error', handleError as any)
 
     // Cleanup
     return () => {
-      if (audioRef && !isPlaying) {
-        audioRef.pause()
-      }
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('error', handleError as any)
+      audio.pause()
+      audio.src = ''
     }
-  }, [beat, audioRef, isPlaying])
+  }, [beat?.mp3_url, volume])
 
   const togglePlayPause = () => {
-    if (!audioRef) {
-      console.log('No audio ref available')
-      return
-    }
-
-    console.log('Toggle play/pause. Current state:', {
-      isPlaying,
-      currentTime: audioRef.currentTime,
-      duration: audioRef.duration,
-      readyState: audioRef.readyState,
-      paused: audioRef.paused,
-      src: audioRef.src
-    })
+    const audio = audioRef.current
+    if (!audio) return
 
     if (isPlaying) {
-      audioRef.pause()
+      audio.pause()
       setIsPlaying(false)
-      console.log('Paused')
     } else {
-      console.log('Attempting to play...')
-      audioRef.play()
-        .then(() => {
-          console.log('Playback started successfully')
-          setIsPlaying(true)
-        })
+      audio.play()
+        .then(() => setIsPlaying(true))
         .catch((error) => {
           console.error('Playback error:', error)
-          console.error('Error name:', error.name)
-          console.error('Error message:', error.message)
-          toast.error(`Failed to play audio: ${error.message}`)
+          toast.error('Failed to play audio')
         })
     }
   }
@@ -250,24 +224,6 @@ export default function BeatDetailPage() {
 
               {/* Audio Player */}
               <div className="card mb-8">
-                {/* Debug Info - Remove after fixing */}
-                <div className="mb-4 p-3 bg-gray-800 rounded text-xs">
-                  <p className="text-yellow-500 font-semibold mb-2">🔍 DEBUG INFO:</p>
-                  <p className="text-gray-300">MP3 URL: {beat.mp3_url || 'NULL/MISSING'}</p>
-                  <p className="text-gray-300">Audio Ref: {audioRef ? 'Created ✅' : 'Not created ❌'}</p>
-                  <p className="text-gray-300">Is Playing: {isPlaying ? 'Yes' : 'No'}</p>
-                  {beat.mp3_url && (
-                    <a 
-                      href={beat.mp3_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline"
-                    >
-                      Test URL in new tab →
-                    </a>
-                  )}
-                </div>
-                
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-1">
@@ -279,7 +235,7 @@ export default function BeatDetailPage() {
                   </div>
                   <button
                     onClick={togglePlayPause}
-                    disabled={!audioRef}
+                    disabled={!audioRef.current}
                     className="w-14 h-14 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg shadow-red-500/50"
                   >
                     {isPlaying ? (
@@ -298,11 +254,12 @@ export default function BeatDetailPage() {
                       <div 
                         className="h-2 bg-gray-700 rounded-full overflow-hidden cursor-pointer hover:h-3 transition-all"
                         onClick={(e) => {
-                          if (audioRef && duration) {
+                          const audio = audioRef.current
+                          if (audio && duration) {
                             const rect = e.currentTarget.getBoundingClientRect()
                             const percent = (e.clientX - rect.left) / rect.width
-                            audioRef.currentTime = percent * duration
-                            setCurrentTime(audioRef.currentTime)
+                            audio.currentTime = percent * duration
+                            setCurrentTime(audio.currentTime)
                           }
                         }}
                       >
@@ -325,7 +282,7 @@ export default function BeatDetailPage() {
                       onClick={() => {
                         const newVolume = volume > 0 ? 0 : 1
                         setVolume(newVolume)
-                        if (audioRef) audioRef.volume = newVolume
+                        if (audioRef.current) audioRef.current.volume = newVolume
                       }}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
@@ -343,7 +300,7 @@ export default function BeatDetailPage() {
                       onChange={(e) => {
                         const newVolume = parseFloat(e.target.value) / 100
                         setVolume(newVolume)
-                        if (audioRef) audioRef.volume = newVolume
+                        if (audioRef.current) audioRef.current.volume = newVolume
                       }}
                       className="w-24 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                       style={{
