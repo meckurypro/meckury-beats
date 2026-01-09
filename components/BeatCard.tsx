@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Play, Pause, TrendingUp, Lock, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import toast from 'react-hot-toast'
 
 interface BeatCardProps {
   beat: {
@@ -28,34 +27,18 @@ export default function BeatCard({ beat }: BeatCardProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [localPlayCount, setLocalPlayCount] = useState(beat.play_count)
-  const [hasPlayed, setHasPlayed] = useState(false) // Track if play has been counted
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    // Create audio element
+    // Create audio element - SIMPLE VERSION like original
     if (!audioRef.current && beat.mp3_url) {
       const audio = new Audio(beat.mp3_url)
       audio.crossOrigin = 'anonymous'
       audio.volume = 0.7 // 70% volume for preview
-      
-      audio.addEventListener('loadedmetadata', () => {
-        console.log('Audio loaded for:', beat.title)
-      })
-      
-      audio.addEventListener('playing', () => {
-        console.log('Audio started playing for:', beat.title)
-        if (!hasPlayed) {
-          incrementPlayCount()
-        }
-      })
+      audio.preload = 'metadata' // Just load metadata, not the whole file
       
       audio.addEventListener('ended', () => {
         setIsPlaying(false)
-      })
-      
-      audio.addEventListener('error', (e) => {
-        console.error('Audio error for', beat.title, ':', e)
-        toast.error('Failed to load audio preview')
       })
       
       audioRef.current = audio
@@ -68,7 +51,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
         audioRef.current.src = ''
       }
     }
-  }, [beat.mp3_url, beat.title, hasPlayed])
+  }, [beat.mp3_url])
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -80,22 +63,15 @@ export default function BeatCard({ beat }: BeatCardProps) {
 
   const incrementPlayCount = async () => {
     try {
-      console.log('Incrementing play count for beat:', beat.id)
       const { error } = await supabase.rpc('increment_play_count', { 
         beat_id: beat.id 
       })
       
-      if (error) {
-        console.error('Error incrementing play count:', error)
-        throw error
+      if (!error) {
+        setLocalPlayCount(prev => prev + 1)
       }
-      
-      console.log('Play count incremented successfully for beat:', beat.id)
-      setLocalPlayCount(prev => prev + 1)
-      setHasPlayed(true)
     } catch (error) {
       console.error('Failed to increment play count:', error)
-      // Don't show toast to avoid interrupting user experience
     }
   }
 
@@ -104,31 +80,21 @@ export default function BeatCard({ beat }: BeatCardProps) {
     e.stopPropagation()
     
     const audio = audioRef.current
-    if (!audio) {
-      console.error('Audio element not initialized for:', beat.title)
-      toast.error('Audio not loaded yet')
-      return
-    }
+    if (!audio) return
 
-    try {
-      if (isPlaying) {
-        audio.pause()
-        setIsPlaying(false)
-      } else {
-        // Reset audio to start if it ended previously
-        if (audio.currentTime >= audio.duration - 1) {
-          audio.currentTime = 0
-        }
-        
-        await audio.play()
-        setIsPlaying(true)
-        
-        // Note: The 'playing' event listener will handle play count increment
-        // This ensures we count plays even if user skips around in the audio
-      }
-    } catch (error) {
-      console.error('Playback error for', beat.title, ':', error)
-      toast.error('Failed to play audio preview')
+    if (isPlaying) {
+      audio.pause()
+      setIsPlaying(false)
+    } else {
+      // INCREMENT PLAY COUNT HERE before playing
+      incrementPlayCount()
+      
+      // Play audio
+      audio.play()
+        .then(() => setIsPlaying(true))
+        .catch((error) => {
+          console.error('Playback error:', error)
+        })
     }
   }
 
