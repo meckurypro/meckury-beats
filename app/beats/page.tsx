@@ -2,20 +2,21 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search, Filter, SlidersHorizontal, Plus, Check } from 'lucide-react'
+import { Search, Filter, SlidersHorizontal, Plus, Check, ShoppingCart } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import BeatCard from '@/components/BeatCard'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/context/CartContext'
 import toast from 'react-hot-toast'
 
-// Beat Card Component
-function BeatCard({ beat }: { beat: any }) {
+// Quick Add Button Component for BeatCard
+function QuickAddButton({ beat, licenseType }: { beat: any; licenseType: 'lease' | 'exclusive' }) {
   const { addItem, isInCart } = useCart()
 
-  const handleAddToCart = (e: React.MouseEvent, licenseType: 'lease' | 'exclusive') => {
-    e.stopPropagation()
+  const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault()
+    e.stopPropagation()
 
     // Check if exclusive is sold
     if (licenseType === 'exclusive' && beat.exclusive_sold) {
@@ -45,6 +46,7 @@ function BeatCard({ beat }: { beat: any }) {
     toast.success(`Added ${beat.title} ${licenseType} to cart!`)
   }
 
+  const price = licenseType === 'lease' ? beat.lease_price : beat.exclusive_price
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -53,167 +55,55 @@ function BeatCard({ beat }: { beat: any }) {
     }).format(price)
   }
 
+  if (licenseType === 'exclusive' && beat.exclusive_sold) {
+    return null
+  }
+
   return (
-    <a
-      href={`/beats/${beat.slug}`}
-      className="card-beat group relative overflow-hidden"
+    <button
+      onClick={handleAddToCart}
+      disabled={isInCart(beat.id, licenseType)}
+      className={`
+        flex items-center justify-center space-x-1 px-3 py-1.5 rounded-lg text-xs font-semibold
+        transition-all duration-200 hover:scale-105 active:scale-95
+        ${isInCart(beat.id, licenseType)
+          ? 'bg-meckury-success text-white cursor-not-allowed'
+          : licenseType === 'lease'
+            ? 'bg-meckury-primary hover:bg-meckury-primary/90 text-white'
+            : 'bg-meckury-accent hover:bg-meckury-accent/90 text-white'
+        }
+      `}
+      title={`Add ${licenseType} license to cart - ${formatPrice(price)}`}
     >
-      {/* Cover Art */}
-      <div className="aspect-square relative overflow-hidden bg-background-elevated">
-        <img
-          src={beat.cover_art_url || '/placeholder-beat.jpg'}
-          alt={beat.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        
-        {/* Exclusive Sold Overlay */}
-        {beat.exclusive_sold && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="text-center p-4">
-              <div className="badge badge-warning mb-2">Exclusive Sold</div>
-              <p className="text-white text-sm">Lease Available</p>
-            </div>
-          </div>
-        )}
+      {isInCart(beat.id, licenseType) ? (
+        <>
+          <Check className="w-3 h-3" />
+          <span>In Cart</span>
+        </>
+      ) : (
+        <>
+          <ShoppingCart className="w-3 h-3" />
+          <span>{licenseType === 'lease' ? 'Lease' : 'Exclusive'}</span>
+        </>
+      )}
+    </button>
+  )
+}
 
-        {/* Quick Add Buttons */}
-        <div className="absolute top-3 right-3 flex flex-col space-y-2">
-          <button
-            onClick={(e) => handleAddToCart(e, 'lease')}
-            disabled={isInCart(beat.id, 'lease')}
-            className={`p-2 rounded-full shadow-lg transition-all transform hover:scale-110 ${
-              isInCart(beat.id, 'lease')
-                ? 'bg-meckury-success text-white'
-                : 'bg-meckury-primary hover:bg-meckury-accent text-white'
-            }`}
-            title="Add lease to cart"
-          >
-            {isInCart(beat.id, 'lease') ? (
-              <Check className="w-3 h-3" />
-            ) : (
-              <Plus className="w-3 h-3" />
-            )}
-          </button>
-          
-          {!beat.exclusive_sold && (
-            <button
-              onClick={(e) => handleAddToCart(e, 'exclusive')}
-              disabled={isInCart(beat.id, 'exclusive')}
-              className={`p-2 rounded-full shadow-lg transition-all transform hover:scale-110 ${
-                isInCart(beat.id, 'exclusive')
-                  ? 'bg-meckury-success text-white'
-                  : 'bg-meckury-accent hover:bg-opacity-90 text-white'
-              }`}
-              title="Add exclusive to cart"
-            >
-              {isInCart(beat.id, 'exclusive') ? (
-                <Check className="w-3 h-3" />
-              ) : (
-                <Plus className="w-3 h-3" />
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Play Button Overlay */}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <div className="w-12 h-12 bg-meckury-primary rounded-full flex items-center justify-center transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-            <div className="w-4 h-4 ml-1">
-              <div className="w-0 h-0 border-t-4 border-t-transparent border-b-4 border-b-transparent border-l-6 border-l-white"></div>
-            </div>
-          </div>
+// Enhanced BeatCard wrapper with quick-add buttons
+function EnhancedBeatCard({ beat }: { beat: any }) {
+  return (
+    <div className="relative group">
+      <BeatCard beat={beat} />
+      
+      {/* Quick Add Buttons Overlay */}
+      <div className="absolute top-3 right-3 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        <div className="flex flex-col space-y-2">
+          <QuickAddButton beat={beat} licenseType="lease" />
+          <QuickAddButton beat={beat} licenseType="exclusive" />
         </div>
       </div>
-
-      {/* Beat Info */}
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <div>
-            <h3 className="text-white font-bold text-lg truncate">
-              {beat.title}
-            </h3>
-            {beat.type_beat && (
-              <p className="text-text-muted text-sm truncate">{beat.type_beat}</p>
-            )}
-          </div>
-          <div className="flex items-center space-x-1">
-            {beat.play_count > 0 && (
-              <span className="text-xs text-text-muted flex items-center">
-                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                </svg>
-                {beat.play_count}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Metadata */}
-        <div className="flex items-center space-x-4 text-sm text-text-muted mb-3">
-          {beat.bpm && (
-            <span className="flex items-center">
-              <span className="w-1 h-1 bg-text-muted rounded-full mr-1"></span>
-              {beat.bpm} BPM
-            </span>
-          )}
-          {beat.key && (
-            <span className="flex items-center">
-              <span className="w-1 h-1 bg-text-muted rounded-full mr-1"></span>
-              {beat.key}
-            </span>
-          )}
-        </div>
-
-        {/* Genre & Mood */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {beat.genre && (
-            <span className="px-2 py-1 bg-background-elevated rounded text-xs text-text-secondary">
-              {beat.genre}
-            </span>
-          )}
-          {beat.mood && (
-            <span className="px-2 py-1 bg-background-elevated rounded text-xs text-text-secondary">
-              {beat.mood}
-            </span>
-          )}
-        </div>
-
-        {/* Price & Availability */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <span className="text-meckury-primary font-bold text-lg">
-                {formatPrice(beat.lease_price)}
-              </span>
-              {!beat.exclusive_sold && (
-                <span className="text-meckury-accent font-bold text-lg">
-                  {formatPrice(beat.exclusive_price)}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center space-x-2 text-xs text-text-secondary">
-              <span>Lease</span>
-              {!beat.exclusive_sold && (
-                <>
-                  <span>•</span>
-                  <span>Exclusive</span>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Info */}
-          <div className="text-right">
-            {beat.lease_count > 0 && (
-              <p className="text-xs text-text-muted">
-                {beat.lease_count} lease{beat.lease_count !== 1 ? 's' : ''} sold
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-    </a>
+    </div>
   )
 }
 
@@ -232,12 +122,13 @@ function BeatsContent() {
     availability: searchParams.get('availability') || 'all',
   })
 
+  // Fetch beats on mount
   useEffect(() => {
     fetchBeats()
   }, [])
 
+  // Sync filters with URL params
   useEffect(() => {
-    // Update filters from URL params
     const genre = searchParams.get('genre')
     const mood = searchParams.get('mood')
     const bpm = searchParams.get('bpm')
@@ -255,6 +146,7 @@ function BeatsContent() {
     }
   }, [searchParams])
 
+  // Apply filters when dependencies change
   useEffect(() => {
     applyFilters()
   }, [beats, searchQuery, filters])
@@ -281,13 +173,15 @@ function BeatsContent() {
     let filtered = [...beats]
 
     // Search filter
-    if (searchQuery) {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
       filtered = filtered.filter(
         (beat) =>
-          beat.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          beat.type_beat?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          beat.genre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          beat.mood?.toLowerCase().includes(searchQuery.toLowerCase())
+          beat.title.toLowerCase().includes(query) ||
+          beat.type_beat?.toLowerCase().includes(query) ||
+          beat.genre?.toLowerCase().includes(query) ||
+          beat.mood?.toLowerCase().includes(query) ||
+          beat.key?.toLowerCase().includes(query)
       )
     }
 
@@ -305,7 +199,7 @@ function BeatsContent() {
     if (filters.bpmRange !== 'all') {
       const [min, max] = filters.bpmRange.split('-').map(Number)
       filtered = filtered.filter(
-        (beat) => beat.bpm >= min && beat.bpm <= max
+        (beat) => beat.bpm && beat.bpm >= min && beat.bpm <= max
       )
     }
 
@@ -348,15 +242,33 @@ function BeatsContent() {
     return Array.from(moods).sort()
   }
 
+  const getUniqueBPMRanges = () => {
+    const ranges = [
+      { value: '60-90', label: '60-90 BPM (Slow)' },
+      { value: '90-120', label: '90-120 BPM (Medium)' },
+      { value: '120-140', label: '120-140 BPM (Upbeat)' },
+      { value: '140-180', label: '140-180 BPM (Fast)' },
+    ]
+    return ranges
+  }
+
+  const getPriceRanges = () => {
+    return [
+      { value: '0-20000', label: 'Under ₦20,000' },
+      { value: '20000-40000', label: '₦20,000 - ₦40,000' },
+      { value: '40000-100000', label: 'Above ₦40,000' },
+    ]
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
 
-      <div className="pt-32 pb-20 bg-background">
+      <div className="pt-28 pb-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
-          <div className="mb-12">
-            <h1 className="text-5xl font-display font-bold text-white mb-4">
+          <div className="mb-10 text-center">
+            <h1 className="text-4xl md:text-5xl font-display font-bold text-white mb-4">
               Premium Beats Catalog
             </h1>
             <p className="text-text-secondary text-lg">
@@ -365,9 +277,9 @@ function BeatsContent() {
           </div>
 
           {/* Search and Filter Bar */}
-          <div className="mb-8 space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              {/* Search */}
+          <div className="mb-8">
+            <div className="flex flex-col md:flex-row gap-4 mb-4">
+              {/* Search Input */}
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5" />
                 <input
@@ -375,14 +287,17 @@ function BeatsContent() {
                   placeholder="Search beats by title, type, genre, or mood..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="input pl-12"
+                  className="input pl-12 w-full"
+                  aria-label="Search beats"
                 />
               </div>
 
-              {/* Filter Toggle */}
+              {/* Filter Toggle Button */}
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="btn-outline flex items-center justify-center space-x-2"
+                className="btn-outline flex items-center justify-center space-x-2 px-6 py-3"
+                aria-expanded={showFilters}
+                aria-controls="filters-panel"
               >
                 <SlidersHorizontal className="w-5 h-5" />
                 <span>Filters</span>
@@ -396,9 +311,12 @@ function BeatsContent() {
 
             {/* Filters Panel */}
             {showFilters && (
-              <div className="card animate-slide-down">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                  {/* Genre */}
+              <div 
+                id="filters-panel"
+                className="card animate-slide-down p-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  {/* Genre Filter */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Genre
@@ -408,7 +326,8 @@ function BeatsContent() {
                       onChange={(e) =>
                         setFilters({ ...filters, genre: e.target.value })
                       }
-                      className="input"
+                      className="input w-full"
+                      aria-label="Filter by genre"
                     >
                       <option value="all">All Genres</option>
                       {getGenreOptions().map((genre) => (
@@ -419,7 +338,7 @@ function BeatsContent() {
                     </select>
                   </div>
 
-                  {/* Mood */}
+                  {/* Mood Filter */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Mood
@@ -429,7 +348,8 @@ function BeatsContent() {
                       onChange={(e) =>
                         setFilters({ ...filters, mood: e.target.value })
                       }
-                      className="input"
+                      className="input w-full"
+                      aria-label="Filter by mood"
                     >
                       <option value="all">All Moods</option>
                       {getMoodOptions().map((mood) => (
@@ -440,7 +360,7 @@ function BeatsContent() {
                     </select>
                   </div>
 
-                  {/* BPM Range */}
+                  {/* BPM Filter */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       BPM Range
@@ -450,17 +370,19 @@ function BeatsContent() {
                       onChange={(e) =>
                         setFilters({ ...filters, bpmRange: e.target.value })
                       }
-                      className="input"
+                      className="input w-full"
+                      aria-label="Filter by BPM range"
                     >
                       <option value="all">Any BPM</option>
-                      <option value="60-90">60-90 BPM (Slow)</option>
-                      <option value="90-120">90-120 BPM (Medium)</option>
-                      <option value="120-140">120-140 BPM (Upbeat)</option>
-                      <option value="140-180">140-180 BPM (Fast)</option>
+                      {getUniqueBPMRanges().map((range) => (
+                        <option key={range.value} value={range.value}>
+                          {range.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Price Range */}
+                  {/* Price Filter */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Price Range
@@ -470,16 +392,19 @@ function BeatsContent() {
                       onChange={(e) =>
                         setFilters({ ...filters, priceRange: e.target.value })
                       }
-                      className="input"
+                      className="input w-full"
+                      aria-label="Filter by price range"
                     >
                       <option value="all">Any Price</option>
-                      <option value="0-20000">Under ₦20,000</option>
-                      <option value="20000-40000">₦20,000 - ₦40,000</option>
-                      <option value="40000-100000">Above ₦40,000</option>
+                      {getPriceRanges().map((range) => (
+                        <option key={range.value} value={range.value}>
+                          {range.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  {/* Availability */}
+                  {/* Availability Filter */}
                   <div>
                     <label className="block text-sm font-medium text-text-secondary mb-2">
                       Availability
@@ -489,7 +414,8 @@ function BeatsContent() {
                       onChange={(e) =>
                         setFilters({ ...filters, availability: e.target.value })
                       }
-                      className="input"
+                      className="input w-full"
+                      aria-label="Filter by availability"
                     >
                       <option value="all">All Beats</option>
                       <option value="available">Exclusive Available</option>
@@ -498,22 +424,23 @@ function BeatsContent() {
                   </div>
                 </div>
 
-                <div className="mt-6 flex flex-col sm:flex-row justify-between items-center pt-6 border-t border-meckury-mediumGray">
-                  <div className="mb-4 sm:mb-0">
-                    <p className="text-text-secondary text-sm">
-                      {filteredBeats.length} beats match your criteria
-                    </p>
+                {/* Filter Actions */}
+                <div className="mt-6 pt-6 border-t border-meckury-mediumGray flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="text-text-secondary text-sm">
+                    <span className="font-semibold text-white">{filteredBeats.length}</span> beats match your criteria
                   </div>
-                  <div className="flex space-x-3">
+                  <div className="flex flex-wrap gap-3">
                     <button
                       onClick={resetFilters}
-                      className="text-meckury-primary hover:text-meckury-accent font-medium"
+                      className="text-meckury-primary hover:text-meckury-accent font-medium px-3 py-2"
+                      aria-label="Reset all filters"
                     >
                       Reset All Filters
                     </button>
                     <button
                       onClick={() => setShowFilters(false)}
-                      className="btn-primary px-4 py-2"
+                      className="btn-primary px-6 py-2"
+                      aria-label="Apply filters"
                     >
                       Apply Filters
                     </button>
@@ -523,46 +450,53 @@ function BeatsContent() {
             )}
           </div>
 
-          {/* Results Summary */}
-          <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
-            <p className="text-text-secondary">
-              Showing <span className="text-white font-semibold">{filteredBeats.length}</span> of{' '}
-              <span className="text-white font-semibold">{beats.length}</span> beats
-            </p>
-            
-            {Object.values(filters).some(f => f !== 'all') && (
+          {/* Active Filters Display */}
+          {Object.values(filters).some(f => f !== 'all') && (
+            <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <p className="text-text-secondary">
+                Showing <span className="text-white font-semibold">{filteredBeats.length}</span> of{' '}
+                <span className="text-white font-semibold">{beats.length}</span> beats
+              </p>
+              
               <div className="flex flex-wrap gap-2">
                 {filters.genre !== 'all' && (
-                  <span className="badge badge-primary">{filters.genre}</span>
+                  <span className="badge badge-primary" aria-label={`Genre: ${filters.genre}`}>
+                    {filters.genre}
+                  </span>
                 )}
                 {filters.mood !== 'all' && (
-                  <span className="badge badge-success">{filters.mood}</span>
+                  <span className="badge badge-success" aria-label={`Mood: ${filters.mood}`}>
+                    {filters.mood}
+                  </span>
                 )}
                 {filters.bpmRange !== 'all' && (
-                  <span className="badge badge-warning">{filters.bpmRange} BPM</span>
+                  <span className="badge badge-warning" aria-label={`BPM: ${filters.bpmRange}`}>
+                    {filters.bpmRange} BPM
+                  </span>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Beats Grid */}
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(9)].map((_, i) => (
+              {[...Array(6)].map((_, i) => (
                 <div
                   key={i}
                   className="bg-background-card rounded-xl h-96 animate-pulse"
-                ></div>
+                  aria-label="Loading beat card"
+                />
               ))}
             </div>
           ) : filteredBeats.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredBeats.map((beat) => (
-                <BeatCard key={beat.id} beat={beat} />
+                <EnhancedBeatCard key={beat.id} beat={beat} />
               ))}
             </div>
           ) : (
-            <div className="text-center py-20 card">
+            <div className="text-center py-16 card">
               <Filter className="w-16 h-16 text-meckury-mediumGray mx-auto mb-4" />
               <h3 className="text-2xl font-semibold text-white mb-2">
                 No beats found
@@ -573,7 +507,11 @@ function BeatsContent() {
                   : 'No beats available at the moment. Check back soon!'}
               </p>
               {(searchQuery || Object.values(filters).some(f => f !== 'all')) && (
-                <button onClick={resetFilters} className="btn-primary">
+                <button 
+                  onClick={resetFilters} 
+                  className="btn-primary px-6 py-3"
+                  aria-label="Clear all filters"
+                >
                   Clear Filters
                 </button>
               )}
@@ -582,8 +520,8 @@ function BeatsContent() {
 
           {/* Featured Beats Section */}
           {!loading && beats.some(b => b.featured) && (
-            <div className="mt-16">
-              <div className="mb-8">
+            <div className="mt-20">
+              <div className="mb-8 text-center">
                 <h2 className="text-3xl font-bold text-white mb-2">
                   Featured Beats
                 </h2>
@@ -596,7 +534,7 @@ function BeatsContent() {
                   .filter(beat => beat.featured)
                   .slice(0, 3)
                   .map((beat) => (
-                    <BeatCard key={beat.id} beat={beat} />
+                    <EnhancedBeatCard key={beat.id} beat={beat} />
                   ))}
               </div>
             </div>
@@ -613,7 +551,7 @@ export default function BeatsPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner w-12 h-12"></div>
+        <div className="spinner w-12 h-12" aria-label="Loading beats page" />
       </div>
     }>
       <BeatsContent />
