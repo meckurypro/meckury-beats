@@ -46,12 +46,40 @@ export default function BeatDetailPage() {
   useEffect(() => {
     // Initialize audio element when beat is loaded
     if (beat && beat.mp3_url && !audioRef) {
-      const audio = new Audio(beat.mp3_url)
-      audio.addEventListener('ended', () => setIsPlaying(false))
+      console.log('Initializing audio with URL:', beat.mp3_url)
+      
+      const audio = new Audio()
+      audio.crossOrigin = 'anonymous' // Enable CORS
+      audio.preload = 'metadata'
+      
+      audio.addEventListener('loadedmetadata', () => {
+        console.log('Audio metadata loaded, duration:', audio.duration)
+      })
+      
+      audio.addEventListener('canplay', () => {
+        console.log('Audio can play')
+      })
+      
+      audio.addEventListener('ended', () => {
+        console.log('Audio ended')
+        setIsPlaying(false)
+      })
+      
       audio.addEventListener('error', (e) => {
         console.error('Audio error:', e)
-        toast.error('Failed to load audio')
+        console.error('Audio error details:', {
+          error: audio.error,
+          code: audio.error?.code,
+          message: audio.error?.message,
+          networkState: audio.networkState,
+          readyState: audio.readyState,
+          src: audio.src
+        })
+        toast.error('Failed to load audio. Check console for details.')
       })
+      
+      // Set source after all event listeners are attached
+      audio.src = beat.mp3_url
       setAudioRef(audio)
     }
 
@@ -74,17 +102,36 @@ export default function BeatDetailPage() {
   }, [beat, isPlaying, audioRef])
 
   const togglePlayPause = () => {
-    if (!audioRef) return
+    if (!audioRef) {
+      console.log('No audio ref available')
+      return
+    }
+
+    console.log('Toggle play/pause. Current state:', {
+      isPlaying,
+      currentTime: audioRef.currentTime,
+      duration: audioRef.duration,
+      readyState: audioRef.readyState,
+      paused: audioRef.paused,
+      src: audioRef.src
+    })
 
     if (isPlaying) {
       audioRef.pause()
       setIsPlaying(false)
+      console.log('Paused')
     } else {
+      console.log('Attempting to play...')
       audioRef.play()
-        .then(() => setIsPlaying(true))
+        .then(() => {
+          console.log('Playback started successfully')
+          setIsPlaying(true)
+        })
         .catch((error) => {
           console.error('Playback error:', error)
-          toast.error('Failed to play audio')
+          console.error('Error name:', error.name)
+          console.error('Error message:', error.message)
+          toast.error(`Failed to play audio: ${error.message}`)
         })
     }
   }
@@ -201,6 +248,24 @@ export default function BeatDetailPage() {
 
               {/* Audio Player */}
               <div className="card mb-8">
+                {/* Debug Info - Remove after fixing */}
+                <div className="mb-4 p-3 bg-gray-800 rounded text-xs">
+                  <p className="text-yellow-500 font-semibold mb-2">🔍 DEBUG INFO:</p>
+                  <p className="text-gray-300">MP3 URL: {beat.mp3_url || 'NULL/MISSING'}</p>
+                  <p className="text-gray-300">Audio Ref: {audioRef ? 'Created ✅' : 'Not created ❌'}</p>
+                  <p className="text-gray-300">Is Playing: {isPlaying ? 'Yes' : 'No'}</p>
+                  {beat.mp3_url && (
+                    <a 
+                      href={beat.mp3_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:underline"
+                    >
+                      Test URL in new tab →
+                    </a>
+                  )}
+                </div>
+                
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-1">
