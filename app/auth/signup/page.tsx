@@ -61,8 +61,8 @@ export default function SignUpPage() {
         {/* Logo */}
         <Link href="/" className="block text-center mb-8">
           <div className="text-4xl font-display font-bold">
-            <span className="text-meckury-primary">DANKE</span>
-            <span className="text-white ml-2">MECKURY</span>
+            <span className="text-meckury-primary">Meckury</span>
+            <span className="text-white ml-2">Pro</span>
           </div>
         </Link>
 
