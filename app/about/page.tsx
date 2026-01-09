@@ -35,7 +35,7 @@ export default function AboutPage() {
                   Meckury is a Nigerian music producer, beat maker, singer, songwriter, and music composer currently based in Enugu. With over 10 years of experience in music production, Meckury has developed a versatile sound that spans multiple genres including Afrobeats, Amapiano, Afrogospel, Drill, and more.
                 </p>
                 <p>
-                  Operating from CovaStoris studio in Lagos, Meckury has worked with numerous artists across Nigeria, helping them bring their musical visions to life through professional production, mixing, and mastering services.
+                  Operating from CovaStoris studio NG, Meckury has worked with numerous artists across Nigeria, helping them bring their musical visions to life through professional production, mixing, and mastering services.
                 </p>
                 <p>
                   The signature "Danke Meckury" producer tag has become synonymous with quality beats that resonate with audiences. Whether it's melodic Afrobeats, energetic Amapiano, soulful Afrogospel, or hard-hitting Drill, Meckury's versatility and creativity make every project unique.
@@ -49,7 +49,7 @@ export default function AboutPage() {
                 <div className="w-12 h-12 bg-meckury-primary bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Music className="w-6 h-6 text-meckury-primary" />
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">20+</div>
+                <div className="text-3xl font-bold text-white mb-1">50+</div>
                 <div className="text-text-secondary text-sm">Beats Available</div>
               </div>
 
