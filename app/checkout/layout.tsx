@@ -1,9 +1,13 @@
+'use client'
+
 import Script from 'next/script'
 
 /**
- * Checkout-specific layout
+ * Checkout-specific layout (Client Component)
  * Loads Paystack payment script before page becomes interactive
  * This ensures the payment modal is always available when users reach checkout
+ * 
+ * Note: This must be a Client Component to support Script component event handlers
  */
 export default function CheckoutLayout({
   children,
