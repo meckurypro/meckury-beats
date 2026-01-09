@@ -1,14 +1,13 @@
-// app/auth/verify-email/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Mail, ArrowLeft, RefreshCw, Copy, Check } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [token, setToken] = useState('')
@@ -71,7 +70,7 @@ export default function VerifyEmailPage() {
       if (error) throw error
 
       toast.success('Email verified successfully! Welcome to Meckury Pro!')
-      router.push('/') // Redirect to landing page as requested
+      router.push('/')
     } catch (error: any) {
       toast.error(error.message || 'Invalid verification token. Please try again.')
     } finally {
@@ -94,9 +93,8 @@ export default function VerifyEmailPage() {
       if (error) throw error
 
       toast.success('New verification email sent! Check your inbox.')
-      setCountdown(60) // 60 second cooldown
+      setCountdown(60)
       
-      // Start countdown
       const interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -277,5 +275,17 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="spinner"></div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }
