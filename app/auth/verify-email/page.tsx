@@ -159,7 +159,6 @@ function VerifyEmailContent() {
               <li>Check your email for a message from Meckury Pro</li>
               <li>Find the verification token (looks like a long code)</li>
               <li>Copy the entire token and paste it below</li>
-              <li>Alternatively, click the confirmation link in the email</li>
             </ol>
           </div>
 
