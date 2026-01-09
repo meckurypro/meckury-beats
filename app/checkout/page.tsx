@@ -8,6 +8,9 @@ import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
+/**
+ * Global type declarations for Paystack
+ */
 declare global {
   interface Window {
     PaystackPop?: {
@@ -16,6 +19,9 @@ declare global {
   }
 }
 
+/**
+ * Paystack payment options interface
+ */
 interface PaystackOptions {
   key: string
   email: string
@@ -29,53 +35,59 @@ interface PaystackOptions {
   onClose?: () => void
 }
 
+/**
+ * Checkout Content Component
+ * Handles payment flow with Paystack integration
+ */
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
+  // URL parameters
   const beatId = searchParams.get('beat')
   const licenseType = searchParams.get('license') as 'lease' | 'exclusive'
   const amount = parseInt(searchParams.get('amount') || '0')
 
+  // Component state
   const [beat, setBeat] = useState<any>(null)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [paystackLoaded, setPaystackLoaded] = useState(false)
 
+  /**
+   * Initialize component
+   * Check auth, fetch beat data, and verify Paystack is loaded
+   */
   useEffect(() => {
     checkAuth()
     if (beatId) {
       fetchBeat()
     }
     
-    // Check if Paystack is loaded
-    const checkPaystack = () => {
+    // Check if Paystack script is loaded
+    const checkPaystackScript = () => {
       if (typeof window !== 'undefined' && window.PaystackPop) {
         setPaystackLoaded(true)
+        console.log('✅ Paystack available on window object')
+      } else {
+        console.warn('⚠️ Paystack not yet available')
       }
     }
     
     // Check immediately
-    checkPaystack()
+    checkPaystackScript()
     
-    // Check again after a delay (in case script loads later)
-    const timer = setTimeout(checkPaystack, 1000)
+    // Retry after delay (in case script loads late)
+    const timer = setTimeout(checkPaystackScript, 1500)
     
-    // Listen for script load
-    const script = document.querySelector('script[src*="paystack"]')
-    if (script) {
-      script.addEventListener('load', checkPaystack)
-    }
-    
-    return () => {
-      clearTimeout(timer)
-      if (script) {
-        script.removeEventListener('load', checkPaystack)
-      }
-    }
+    return () => clearTimeout(timer)
   }, [beatId])
 
+  /**
+   * Verify user authentication
+   * Redirect to sign-in if not authenticated
+   */
   const checkAuth = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -86,6 +98,10 @@ function CheckoutContent() {
     setUser(user)
   }
 
+  /**
+   * Fetch beat details from database
+   * Verify availability for exclusive purchases
+   */
   const fetchBeat = async () => {
     try {
       const { data, error } = await supabase
@@ -96,7 +112,7 @@ function CheckoutContent() {
 
       if (error) throw error
       
-      // Check if exclusive and already sold
+      // Verify exclusive beat is still available
       if (licenseType === 'exclusive' && data.exclusive_sold) {
         toast.error('This beat is no longer available for exclusive purchase')
         router.push(`/beats/${data.slug}`)
@@ -113,12 +129,16 @@ function CheckoutContent() {
     }
   }
 
+  /**
+   * Handle successful payment
+   * Create purchase record and update beat status
+   */
   const handlePaymentSuccess = async (response: any) => {
-    console.log('Payment successful:', response)
+    console.log('✅ Payment successful:', response.reference)
     setProcessing(true)
     
     try {
-      // Create purchase record
+      // Create purchase record in database
       const { data: purchase, error: purchaseError } = await supabase
         .from('purchases')
         .insert({
@@ -134,8 +154,9 @@ function CheckoutContent() {
 
       if (purchaseError) throw purchaseError
 
-      // If exclusive, mark beat as sold
+      // Handle exclusive purchase
       if (licenseType === 'exclusive') {
+        // Mark beat as sold
         const { error: updateError } = await supabase
           .from('beats')
           .update({
@@ -146,7 +167,7 @@ function CheckoutContent() {
 
         if (updateError) throw updateError
 
-        // Create stems request
+        // Create stems request for producer
         const { error: stemsError } = await supabase
           .from('stems_requests')
           .insert({
@@ -159,14 +180,14 @@ function CheckoutContent() {
         if (stemsError) throw stemsError
       }
 
-      // Increment lease count if lease
+      // Increment lease count for lease purchases
       if (licenseType === 'lease') {
         await supabase.rpc('increment_lease_count', { beat_id: beatId })
       }
 
       toast.success('Payment successful! Redirecting to your downloads...')
       
-      // Redirect to dashboard after 2 seconds
+      // Redirect to dashboard
       setTimeout(() => {
         router.push('/dashboard')
       }, 2000)
@@ -178,41 +199,52 @@ function CheckoutContent() {
     }
   }
 
+  /**
+   * Handle payment modal close/cancellation
+   */
   const handlePaymentClose = () => {
-    console.log('Payment closed by user')
+    console.log('Payment cancelled by user')
     toast.error('Payment cancelled')
   }
 
+  /**
+   * Initialize Paystack payment modal
+   * Validates all requirements before opening payment window
+   */
   const initializePayment = useCallback(() => {
+    // Prevent duplicate payment attempts
     if (processing) {
       toast.error('Please wait while we process your payment')
       return
     }
 
+    // Validate user email
     if (!user?.email) {
       toast.error('Email address is required')
       return
     }
 
-    // Check if Paystack is loaded
+    // Verify Paystack script is loaded
     if (!window.PaystackPop) {
-      toast.error('Payment system is loading. Please wait a moment and try again.')
-      console.error('Paystack not loaded. Available window.PaystackPop:', window.PaystackPop)
+      toast.error('Payment system is still loading. Please wait a moment and try again.')
+      console.error('❌ Paystack not loaded. window.PaystackPop:', window.PaystackPop)
       return
     }
 
+    // Verify Paystack public key exists
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
     if (!paystackKey) {
       toast.error('Payment configuration error. Please contact support.')
-      console.error('Paystack public key not found')
+      console.error('❌ Paystack public key not found in environment variables')
       return
     }
 
     try {
+      // Configure Paystack payment options
       const paystackOptions: PaystackOptions = {
         key: paystackKey,
         email: user.email,
-        amount: amount * 100,
+        amount: amount * 100, // Convert to kobo (Paystack requires smallest currency unit)
         ref: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         currency: 'NGN',
         channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
@@ -236,21 +268,24 @@ function CheckoutContent() {
         }
       }
 
-      console.log('Initializing Paystack payment with options:', {
-        ...paystackOptions,
-        key: `${paystackKey.substring(0, 10)}...`,
-        email: user.email
+      console.log('Initializing Paystack payment...', {
+        email: user.email,
+        amount: amount,
+        currency: 'NGN'
       })
 
-      // Use Paystack's setup method
+      // Initialize Paystack and open payment modal
       const handler = window.PaystackPop.setup(paystackOptions)
       handler.openIframe()
     } catch (error) {
-      console.error('Error initializing Paystack payment:', error)
+      console.error('❌ Error initializing Paystack payment:', error)
       toast.error('Failed to initialize payment. Please try again.')
     }
-  }, [processing, user, amount, beatId, licenseType, handlePaymentSuccess, handlePaymentClose])
+  }, [processing, user, amount, beatId, licenseType])
 
+  /**
+   * Format price in Nigerian Naira
+   */
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -259,6 +294,7 @@ function CheckoutContent() {
     }).format(price)
   }
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -267,6 +303,7 @@ function CheckoutContent() {
     )
   }
 
+  // Guard: Ensure beat and user data exists
   if (!beat || !user) {
     return null
   }
@@ -305,7 +342,7 @@ function CheckoutContent() {
                 </h2>
 
                 <div className="flex items-start space-x-4 mb-6">
-                  {/* Beat Cover */}
+                  {/* Beat Cover Art */}
                   <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-background-elevated">
                     {beat.cover_art_url ? (
                       <img
@@ -320,7 +357,7 @@ function CheckoutContent() {
                     )}
                   </div>
 
-                  {/* Beat Info */}
+                  {/* Beat Information */}
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-white mb-1">
                       {beat.title}
@@ -389,6 +426,7 @@ function CheckoutContent() {
               <div className="card sticky top-32">
                 <h3 className="text-xl font-bold text-white mb-6">Payment</h3>
 
+                {/* Price Breakdown */}
                 <div className="space-y-4 mb-6">
                   <div className="flex justify-between">
                     <span className="text-text-secondary">Subtotal</span>
@@ -408,14 +446,7 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                {/* Debug info (remove in production) */}
-                <div className="mb-4 text-xs text-gray-500">
-                  <div>Paystack loaded: {paystackLoaded ? 'Yes' : 'No'}</div>
-                  <div>User email: {user?.email ? 'Set' : 'Not set'}</div>
-                  <div>Amount: {amount} NGN</div>
-                </div>
-
-                {/* Paystack Button */}
+                {/* Payment Button */}
                 {!processing ? (
                   <button
                     onClick={initializePayment}
@@ -426,7 +457,7 @@ function CheckoutContent() {
                   >
                     <CreditCard className="w-5 h-5" />
                     <span>
-                      {!paystackLoaded ? 'Loading Payment...' : 'Pay with Paystack'}
+                      {!paystackLoaded ? 'Loading Payment System...' : 'Pay with Paystack'}
                     </span>
                   </button>
                 ) : (
@@ -435,7 +466,7 @@ function CheckoutContent() {
                     className="btn-primary w-full flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed py-4"
                   >
                     <div className="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
+                    <span>Processing Payment...</span>
                   </button>
                 )}
 
@@ -454,7 +485,7 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                {/* License Note */}
+                {/* License Agreement Notice */}
                 <div className="mt-4 p-3 bg-meckury-secondary bg-opacity-10 rounded-lg border border-meckury-secondary">
                   <p className="text-text-secondary text-xs">
                     By completing this purchase, you agree to our{' '}
@@ -474,6 +505,10 @@ function CheckoutContent() {
   )
 }
 
+/**
+ * Checkout Page with Suspense boundary
+ * Handles URL search params loading state
+ */
 export default function CheckoutPage() {
   return (
     <Suspense fallback={
