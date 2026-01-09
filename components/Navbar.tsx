@@ -80,9 +80,9 @@ export default function Navbar() {
           <Link href="/" className="flex items-center space-x-3 group">
             <div className="text-2xl sm:text-3xl font-display font-bold">
               <span className="text-meckury-primary group-hover:text-meckury-accent transition-colors">
-                DANKE
+                Meckury
               </span>
-              <span className="text-white ml-2">MECKURY</span>
+              <span className="text-white ml-2">Pro</span>
             </div>
           </Link>
 
