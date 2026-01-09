@@ -14,13 +14,14 @@ import {
   Clock,
   TrendingUp,
   Lock,
-  Plus,
+  ExternalLink,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
+import EmbeddedPlayer from '@/components/EmbeddedPlayer'
 import { supabase } from '@/lib/supabase'
-import { useCart } from '@/context/CartContext'
 import toast from 'react-hot-toast'
+import { getPlatformName } from '@/lib/extractSongData'
 
 export default function BeatDetailPage() {
   const params = useParams()
@@ -29,8 +30,8 @@ export default function BeatDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
   const [user, setUser] = useState<any>(null)
-  
-  const { addItem, isInCart } = useCart()
+  const [featuredSong, setFeaturedSong] = useState<any>(null)
+  const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (params.slug) {
@@ -41,6 +42,52 @@ export default function BeatDetailPage() {
       setUser(session?.user ?? null)
     })
   }, [params.slug])
+
+  useEffect(() => {
+    // Initialize audio element when beat is loaded
+    if (beat && beat.mp3_url && !audioRef) {
+      const audio = new Audio(beat.mp3_url)
+      audio.addEventListener('ended', () => setIsPlaying(false))
+      audio.addEventListener('error', (e) => {
+        console.error('Audio error:', e)
+        toast.error('Failed to load audio')
+      })
+      setAudioRef(audio)
+    }
+
+    // Update progress bar every second when playing
+    let interval: NodeJS.Timeout | null = null
+    if (isPlaying && audioRef) {
+      interval = setInterval(() => {
+        // Force re-render to update progress
+        setBeat((prev: any) => ({ ...prev }))
+      }, 100)
+    }
+
+    // Cleanup
+    return () => {
+      if (interval) clearInterval(interval)
+      if (audioRef && !isPlaying) {
+        audioRef.pause()
+      }
+    }
+  }, [beat, isPlaying, audioRef])
+
+  const togglePlayPause = () => {
+    if (!audioRef) return
+
+    if (isPlaying) {
+      audioRef.pause()
+      setIsPlaying(false)
+    } else {
+      audioRef.play()
+        .then(() => setIsPlaying(true))
+        .catch((error) => {
+          console.error('Playback error:', error)
+          toast.error('Failed to play audio')
+        })
+    }
+  }
 
   const fetchBeat = async (slug: string) => {
     try {
@@ -56,6 +103,21 @@ export default function BeatDetailPage() {
 
       // Increment play count
       await supabase.rpc('increment_play_count', { beat_id: data.id })
+
+      // If exclusive is sold, fetch the featured song submission
+      if (data.exclusive_sold) {
+        const { data: songData } = await supabase
+          .from('song_submissions')
+          .select('*')
+          .eq('beat_id', data.id)
+          .eq('featured', true)
+          .eq('status', 'approved')
+          .single()
+
+        if (songData) {
+          setFeaturedSong(songData)
+        }
+      }
     } catch (error) {
       console.error('Error fetching beat:', error)
       toast.error('Beat not found')
@@ -65,40 +127,7 @@ export default function BeatDetailPage() {
     }
   }
 
-  const handleAddToCart = (licenseType: 'lease' | 'exclusive') => {
-    if (!beat) return
-
-    const price = licenseType === 'lease' ? beat.lease_price : beat.exclusive_price
-    
-    // Check if exclusive is sold
-    if (licenseType === 'exclusive' && beat.exclusive_sold) {
-      toast.error('This beat is no longer available for exclusive purchase')
-      return
-    }
-
-    // Check if already in cart
-    if (isInCart(beat.id, licenseType)) {
-      toast.error('This item is already in your cart')
-      return
-    }
-
-    addItem({
-      beatId: beat.id,
-      beatTitle: beat.title,
-      beatSlug: beat.slug,
-      coverArtUrl: beat.cover_art_url,
-      bpm: beat.bpm,
-      key: beat.key,
-      typeBeat: beat.type_beat,
-      licenseType,
-      price,
-      quantity: 1,
-    })
-
-    toast.success(`Added ${beat.title} ${licenseType} license to cart!`)
-  }
-
-  const handleDirectCheckout = (licenseType: 'lease' | 'exclusive') => {
+  const handlePurchase = async (licenseType: 'lease' | 'exclusive') => {
     if (!user) {
       toast.error('Please sign in to purchase')
       router.push('/auth/signin')
@@ -182,8 +211,9 @@ export default function BeatDetailPage() {
                     )}
                   </div>
                   <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="w-14 h-14 bg-meckury-primary hover:bg-meckury-accent rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-glow"
+                    onClick={togglePlayPause}
+                    disabled={!audioRef}
+                    className="w-14 h-14 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg shadow-red-500/50"
                   >
                     {isPlaying ? (
                       <Pause className="w-6 h-6 text-white" fill="white" />
@@ -193,10 +223,27 @@ export default function BeatDetailPage() {
                   </button>
                 </div>
 
-                {/* Waveform placeholder */}
-                <div className="waveform-container">
-                  <div className="w-full h-full flex items-center justify-center text-text-muted">
-                    Audio Player
+                {/* Audio progress bar */}
+                <div className="bg-background-elevated rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <Music className="w-5 h-5 text-red-500" />
+                    <div className="flex-1">
+                      <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-100"
+                          style={{ 
+                            width: audioRef && audioRef.duration 
+                              ? `${(audioRef.currentTime / audioRef.duration) * 100}%` 
+                              : '0%' 
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                    <span className="text-text-secondary text-sm min-w-[40px]">
+                      {audioRef && audioRef.duration 
+                        ? `${Math.floor(audioRef.currentTime / 60)}:${String(Math.floor(audioRef.currentTime % 60)).padStart(2, '0')}`
+                        : '0:00'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -251,6 +298,41 @@ export default function BeatDetailPage() {
                     <p className="text-text-secondary leading-relaxed">
                       {beat.description}
                     </p>
+                  </div>
+                )}
+
+                {/* Featured Song (for exclusive-sold beats) */}
+                {beat.exclusive_sold && featuredSong && (
+                  <div className="mt-6 pt-6 border-t border-meckury-mediumGray">
+                    <h4 className="text-lg font-semibold text-white mb-4">
+                      🎵 Song Made With This Beat
+                    </h4>
+                    <div className="bg-background-elevated rounded-lg p-4">
+                      <div className="mb-4">
+                        <h5 className="text-xl font-semibold text-white mb-1">
+                          {featuredSong.song_title}
+                        </h5>
+                        <p className="text-text-secondary">by {featuredSong.artist_name}</p>
+                      </div>
+                      {featuredSong.embed_url && (
+                        <div className="mb-4">
+                          <EmbeddedPlayer
+                            platform={featuredSong.platform}
+                            embedUrl={featuredSong.embed_url}
+                            title={`${featuredSong.song_title} by ${featuredSong.artist_name}`}
+                          />
+                        </div>
+                      )}
+                      <a
+                        href={featuredSong.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center space-x-2 text-meckury-primary hover:text-meckury-accent font-medium"
+                      >
+                        <span>Listen on {getPlatformName(featuredSong.platform)}</span>
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>
@@ -310,33 +392,13 @@ export default function BeatDetailPage() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleAddToCart('lease')}
-                      disabled={isInCart(beat.id, 'lease')}
-                      className="btn-outline flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isInCart(beat.id, 'lease') ? (
-                        <>
-                          <Check className="w-5 h-5" />
-                          <span>In Cart</span>
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-5 h-5" />
-                          <span>Add to Cart</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleDirectCheckout('lease')}
-                      className="btn-primary flex-1 flex items-center justify-center space-x-2"
-                    >
-                      <ShoppingCart className="w-5 h-5" />
-                      <span>Buy Now</span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handlePurchase('lease')}
+                    className="btn-primary w-full flex items-center justify-center space-x-2"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    <span>Purchase Lease</span>
+                  </button>
                 </div>
 
                 {/* Exclusive License */}
@@ -394,43 +456,27 @@ export default function BeatDetailPage() {
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  {beat.exclusive_sold ? (
-                    <button
-                      disabled
-                      className="w-full flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg bg-meckury-mediumGray text-text-muted cursor-not-allowed"
-                    >
-                      <Lock className="w-5 h-5" />
-                      <span>Sold Out</span>
-                    </button>
-                  ) : (
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleAddToCart('exclusive')}
-                        disabled={isInCart(beat.id, 'exclusive')}
-                        className="btn-outline flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isInCart(beat.id, 'exclusive') ? (
-                          <>
-                            <Check className="w-5 h-5" />
-                            <span>In Cart</span>
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-5 h-5" />
-                            <span>Add to Cart</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => handleDirectCheckout('exclusive')}
-                        className="flex-1 flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg bg-meckury-accent hover:bg-opacity-90 text-white hover:shadow-glow transition-all"
-                      >
+                  <button
+                    onClick={() => handlePurchase('exclusive')}
+                    disabled={beat.exclusive_sold}
+                    className={`w-full flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg transition-all ${
+                      beat.exclusive_sold
+                        ? 'bg-meckury-mediumGray text-text-muted cursor-not-allowed'
+                        : 'bg-meckury-accent hover:bg-opacity-90 text-white hover:shadow-glow'
+                    }`}
+                  >
+                    {beat.exclusive_sold ? (
+                      <>
+                        <Lock className="w-5 h-5" />
+                        <span>Sold Out</span>
+                      </>
+                    ) : (
+                      <>
                         <Download className="w-5 h-5" />
                         <span>Buy Exclusive</span>
-                      </button>
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </button>
                 </div>
 
                 {/* Need Help */}
