@@ -1,14 +1,13 @@
-// app/auth/reset-password/page.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Lock, Mail, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<'request' | 'reset'>('request')
@@ -26,11 +25,11 @@ export default function ResetPasswordPage() {
   const type = searchParams.get('type')
   
   // If token is present, switch to reset step
-  useState(() => {
+  useEffect(() => {
     if (token && type === 'recovery') {
       setStep('reset')
     }
-  })
+  }, [token, type])
 
   // Handle request reset link
   const handleRequestReset = async (e: React.FormEvent) => {
@@ -352,5 +351,17 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="spinner"></div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
