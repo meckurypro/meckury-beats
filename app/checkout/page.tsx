@@ -1,13 +1,33 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { PaystackButton } from 'react-paystack'
-import { Lock, ShoppingCart, Check, ArrowLeft } from 'lucide-react'
+import { Lock, Check, ArrowLeft, CreditCard } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+
+declare global {
+  interface Window {
+    PaystackPop?: {
+      setup: (options: PaystackOptions) => { openIframe: () => void }
+    }
+  }
+}
+
+interface PaystackOptions {
+  key: string
+  email: string
+  amount: number
+  ref: string
+  currency?: string
+  channels?: string[]
+  metadata?: Record<string, any>
+  onSuccess?: (response: any) => void
+  onCancel?: () => void
+  onClose?: () => void
+}
 
 function CheckoutContent() {
   const router = useRouter()
@@ -30,8 +50,29 @@ function CheckoutContent() {
     }
     
     // Check if Paystack is loaded
-    if (typeof window !== 'undefined' && (window as any).PaystackPop) {
-      setPaystackLoaded(true)
+    const checkPaystack = () => {
+      if (typeof window !== 'undefined' && window.PaystackPop) {
+        setPaystackLoaded(true)
+      }
+    }
+    
+    // Check immediately
+    checkPaystack()
+    
+    // Check again after a delay (in case script loads later)
+    const timer = setTimeout(checkPaystack, 1000)
+    
+    // Listen for script load
+    const script = document.querySelector('script[src*="paystack"]')
+    if (script) {
+      script.addEventListener('load', checkPaystack)
+    }
+    
+    return () => {
+      clearTimeout(timer)
+      if (script) {
+        script.removeEventListener('load', checkPaystack)
+      }
     }
   }, [beatId])
 
@@ -72,8 +113,8 @@ function CheckoutContent() {
     }
   }
 
-  const handlePaymentSuccess = async (reference: any) => {
-    console.log('Payment successful:', reference)
+  const handlePaymentSuccess = async (response: any) => {
+    console.log('Payment successful:', response)
     setProcessing(true)
     
     try {
@@ -85,7 +126,7 @@ function CheckoutContent() {
           beat_id: beatId,
           license_type: licenseType,
           amount: amount,
-          payment_reference: reference.reference,
+          payment_reference: response.reference,
           payment_status: 'completed',
         })
         .select()
@@ -142,32 +183,73 @@ function CheckoutContent() {
     toast.error('Payment cancelled')
   }
 
-  // Fallback Paystack function in case the component doesn't work
-  const initializePaystack = () => {
-    if (processing) return
-    
-    // @ts-ignore
-    if (window.PaystackPop && user?.email) {
-      // @ts-ignore
-      const paystack = new window.PaystackPop()
-      paystack.newTransaction({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+  const initializePayment = useCallback(() => {
+    if (processing) {
+      toast.error('Please wait while we process your payment')
+      return
+    }
+
+    if (!user?.email) {
+      toast.error('Email address is required')
+      return
+    }
+
+    // Check if Paystack is loaded
+    if (!window.PaystackPop) {
+      toast.error('Payment system is loading. Please wait a moment and try again.')
+      console.error('Paystack not loaded. Available window.PaystackPop:', window.PaystackPop)
+      return
+    }
+
+    const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+    if (!paystackKey) {
+      toast.error('Payment configuration error. Please contact support.')
+      console.error('Paystack public key not found')
+      return
+    }
+
+    try {
+      const paystackOptions: PaystackOptions = {
+        key: paystackKey,
         email: user.email,
         amount: amount * 100,
         ref: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        onSuccess: (transaction: any) => {
-          console.log('Transaction success:', transaction)
-          handlePaymentSuccess(transaction)
+        currency: 'NGN',
+        channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+        metadata: {
+          beat_id: beatId,
+          license_type: licenseType,
+          customer_id: user.id,
+          customer_email: user.email,
+        },
+        onSuccess: (response: any) => {
+          console.log('Paystack payment successful:', response)
+          handlePaymentSuccess(response)
         },
         onCancel: () => {
+          console.log('Paystack payment cancelled by user')
           handlePaymentClose()
         },
+        onClose: () => {
+          console.log('Paystack payment window closed')
+          handlePaymentClose()
+        }
+      }
+
+      console.log('Initializing Paystack payment with options:', {
+        ...paystackOptions,
+        key: `${paystackKey.substring(0, 10)}...`,
+        email: user.email
       })
-    } else {
-      console.error('Paystack not loaded or user email missing')
-      toast.error('Payment system not ready. Please refresh the page.')
+
+      // Use Paystack's setup method
+      const handler = window.PaystackPop.setup(paystackOptions)
+      handler.openIframe()
+    } catch (error) {
+      console.error('Error initializing Paystack payment:', error)
+      toast.error('Failed to initialize payment. Please try again.')
     }
-  }
+  }, [processing, user, amount, beatId, licenseType, handlePaymentSuccess, handlePaymentClose])
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -175,31 +257,6 @@ function CheckoutContent() {
       currency: 'NGN',
       minimumFractionDigits: 0,
     }).format(price)
-  }
-
-  const componentProps = {
-    reference: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    email: user?.email || '',
-    amount: amount * 100,
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
-    text: 'Pay with Paystack',
-    onSuccess: handlePaymentSuccess,
-    onClose: handlePaymentClose,
-  }
-
-  // Debug information (remove in production)
-  const debugInfo = () => {
-    console.log({
-      user: user?.email,
-      amount: amount,
-      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.substring(0, 10) + '...',
-      paystackLoaded: paystackLoaded,
-      componentProps: {
-        ...componentProps,
-        email: user?.email?.substring(0, 10) + '...',
-        amount: componentProps.amount
-      }
-    })
   }
 
   if (loading) {
@@ -351,34 +408,27 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                {/* Debug button (remove in production) */}
-                <button
-                  onClick={debugInfo}
-                  className="hidden text-xs text-gray-500 mb-2"
-                >
-                  Debug Info
-                </button>
+                {/* Debug info (remove in production) */}
+                <div className="mb-4 text-xs text-gray-500">
+                  <div>Paystack loaded: {paystackLoaded ? 'Yes' : 'No'}</div>
+                  <div>User email: {user?.email ? 'Set' : 'Not set'}</div>
+                  <div>Amount: {amount} NGN</div>
+                </div>
 
                 {/* Paystack Button */}
                 {!processing ? (
-                  <>
-                    {/* Try using PaystackButton */}
-                    {paystackLoaded ? (
-                      <PaystackButton
-                        {...componentProps}
-                        className="btn-primary w-full flex items-center justify-center space-x-2 py-4"
-                      />
-                    ) : (
-                      /* Fallback button */
-                      <button
-                        onClick={initializePaystack}
-                        className="btn-primary w-full flex items-center justify-center space-x-2 py-4"
-                      >
-                        <Lock className="w-5 h-5" />
-                        <span>Pay with Paystack</span>
-                      </button>
-                    )}
-                  </>
+                  <button
+                    onClick={initializePayment}
+                    disabled={!paystackLoaded || !user?.email}
+                    className={`btn-primary w-full flex items-center justify-center space-x-2 py-4 ${
+                      (!paystackLoaded || !user?.email) ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                    <span>
+                      {!paystackLoaded ? 'Loading Payment...' : 'Pay with Paystack'}
+                    </span>
+                  </button>
                 ) : (
                   <button
                     disabled
