@@ -13,8 +13,8 @@ export default function Footer() {
           {/* Brand */}
           <div className="space-y-4">
             <div className="text-2xl font-display font-bold">
-              <span className="text-meckury-primary">DANKE</span>
-              <span className="text-white ml-2">MECKURY</span>
+              <span className="text-meckury-primary">Meckury</span>
+              <span className="text-white ml-2">Beats</span>
             </div>
             <p className="text-text-secondary text-sm">
               Premium beats & music production by Meckury at CovaStoris.
@@ -146,7 +146,7 @@ export default function Footer() {
                 className="flex items-center space-x-2 text-text-secondary hover:text-white transition-colors"
               >
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">bookings@covastoris.com</span>
+                <span className="text-sm">covastoris@gmail.com</span>
               </a>
             </div>
           </div>
@@ -156,7 +156,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-meckury-mediumGray">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-text-secondary text-sm">
-              © {currentYear} Danke Meckury. All rights reserved.
+              © {currentYear} Meckury. All rights reserved.
             </p>
             <p className="text-text-secondary text-sm">
               Powered by{' '}
