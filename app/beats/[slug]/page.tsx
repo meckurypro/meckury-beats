@@ -319,7 +319,9 @@ export default function BeatDetailPage() {
                           <EmbeddedPlayer
                             platform={featuredSong.platform}
                             embedUrl={featuredSong.embed_url}
-                            title={`${featuredSong.song_title} by ${featuredSong.artist_name}`}
+                            externalUrl={featuredSong.external_url}
+                            title={featuredSong.song_title}
+                            artist={featuredSong.artist_name}
                           />
                         </div>
                       )}
