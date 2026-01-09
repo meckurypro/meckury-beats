@@ -191,7 +191,7 @@ export default function AdminBeatsPage() {
                           </a>
                           <button
                             onClick={() => {
-                              toast.info('Edit feature coming soon')
+                              toast('Edit feature coming soon')
                             }}
                             className="p-2 text-text-secondary hover:text-meckury-accent transition-colors"
                             title="Edit"
