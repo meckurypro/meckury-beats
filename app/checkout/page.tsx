@@ -304,23 +304,26 @@ export default function CheckoutPage() {
                 </div>
 
                 {/* Paystack Button */}
-                <PaystackButton
-                  {...paystackConfig}
-                  text="Pay with Paystack"
-                  onSuccess={handlePaymentSuccess}
-                  onClose={handlePaymentClose}
-                  disabled={processing}
-                  className="btn-primary w-full flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {processing ? (
+                {!processing ? (
+                  <PaystackButton
+                    {...paystackConfig}
+                    text="Pay with Paystack"
+                    onSuccess={handlePaymentSuccess}
+                    onClose={handlePaymentClose}
+                    className="btn-primary w-full flex items-center justify-center space-x-2"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    <span>Pay {formatPrice(amount)}</span>
+                  </PaystackButton>
+                ) : (
+                  <button
+                    disabled
+                    className="btn-primary w-full flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed"
+                  >
                     <div className="spinner"></div>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-5 h-5" />
-                      <span>Pay {formatPrice(amount)}</span>
-                    </>
-                  )}
-                </PaystackButton>
+                    <span>Processing...</span>
+                  </button>
+                )}
 
                 {/* Security Notice */}
                 <div className="mt-6 p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray">
