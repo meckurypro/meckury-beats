@@ -28,6 +28,14 @@ function VerifyEmailContent() {
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user?.email) {
           setEmail(session.user.email)
+        } else {
+          // If no session, we might need to extract email from token or URL
+          const tokenFromUrl = searchParams.get('token')
+          if (tokenFromUrl) {
+            // Try to parse email from token if it's a confirmation link
+            setToken(tokenFromUrl)
+            // You might want to auto-submit if token is in URL
+          }
         }
       }
     }
@@ -58,21 +66,67 @@ function VerifyEmailContent() {
       return
     }
 
+    if (!email) {
+      toast.error('Email is required for verification')
+      return
+    }
+
     setLoading(true)
 
     try {
+      // IMPORTANT: For email confirmation, use type 'email' or 'signup'
+      // The token from the email is actually a full URL, not just a code
+      // We need to extract the token hash from the URL
+      
+      let tokenHash = token.trim();
+      
+      // If the token is a full URL (like from the email link), extract the token parameter
+      if (token.includes('token=')) {
+        const url = new URL(token);
+        tokenHash = url.searchParams.get('token') || token;
+      }
+      
+      // Try different verification methods
       const { error } = await supabase.auth.verifyOtp({
         email,
-        token: token.trim(),
-        type: 'signup'
-      })
+        token: tokenHash,
+        type: 'email'  // Changed from 'signup' to 'email'
+      });
 
-      if (error) throw error
+      if (error) {
+        // Try with 'signup' type as fallback
+        const { error: signupError } = await supabase.auth.verifyOtp({
+          email,
+          token: tokenHash,
+          type: 'signup'
+        });
+        
+        if (signupError) throw signupError;
+      }
 
       toast.success('Email verified successfully! Welcome to Meckury Pro!')
-      router.push('/')
+      
+      // Refresh session to get updated user state
+      await supabase.auth.refreshSession();
+      
+      // Redirect to landing page
+      setTimeout(() => {
+        router.push('/')
+      }, 1500)
+      
     } catch (error: any) {
-      toast.error(error.message || 'Invalid verification token. Please try again.')
+      console.error('Verification error:', error)
+      
+      // More specific error messages
+      if (error.message.includes('token has expired')) {
+        toast.error('Verification token has expired. Please request a new one.')
+      } else if (error.message.includes('invalid token')) {
+        toast.error('Invalid verification token. Please check and try again.')
+      } else if (error.message.includes('email')) {
+        toast.error('Email verification failed. Please ensure you entered the correct email.')
+      } else {
+        toast.error(error.message || 'Failed to verify email. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -81,6 +135,11 @@ function VerifyEmailContent() {
   // Handle resend verification email
   const handleResendVerification = async () => {
     if (countdown > 0) return
+
+    if (!email) {
+      toast.error('Please enter your email address first')
+      return
+    }
 
     setResendLoading(true)
     
@@ -139,26 +198,38 @@ function VerifyEmailContent() {
             </div>
           </div>
 
-          {/* Email Display */}
-          {email && (
-            <div className="mb-6 p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray">
-              <div className="flex items-center">
-                <Mail className="w-5 h-5 text-text-muted mr-3" />
-                <div>
-                  <p className="text-sm text-text-secondary">Verification sent to</p>
-                  <p className="text-white font-medium">{email}</p>
-                </div>
-              </div>
+          {/* Email Display/Input */}
+          <div className="mb-6">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-text-secondary mb-2"
+            >
+              Your Email Address
+            </label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-text-muted w-5 h-5" />
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input pl-12"
+                placeholder="Enter the email you signed up with"
+                required
+              />
             </div>
-          )}
+            <p className="mt-1 text-xs text-text-muted">
+              Enter the email address you used to sign up
+            </p>
+          </div>
 
           {/* Instructions */}
           <div className="mb-6 p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray">
             <h3 className="text-white font-semibold mb-2">How to verify:</h3>
             <ol className="text-sm text-text-secondary space-y-2 list-decimal pl-4">
               <li>Check your email for a message from Meckury Pro</li>
-              <li>Find the verification token (looks like a long code)</li>
-              <li>Copy the entire token and paste it below</li>
+              <li>Copy the entire verification token (or click the link)</li>
+              <li>Paste the token below or enter your email if clicking the link</li>
             </ol>
           </div>
 
@@ -195,17 +266,31 @@ function VerifyEmailContent() {
                   </button>
                 )}
               </div>
+              <p className="mt-1 text-xs text-text-muted">
+                Paste the entire token from your email
+              </p>
             </div>
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
-              className="btn-primary w-full flex items-center justify-center"
+              disabled={loading || !email || !token}
+              className="btn-primary w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <div className="spinner"></div> : 'Verify Email'}
             </button>
           </form>
+
+          {/* Alternative: Auto-verify if token is in URL */}
+          {searchParams.get('token') && !token && (
+            <div className="mt-4 p-4 bg-meckury-primary/10 border border-meckury-primary/30 rounded-lg">
+              <p className="text-sm text-text-secondary">
+                <span className="font-semibold text-white">Token detected in URL</span>
+                <br />
+                Enter your email above and click "Verify Email" to continue.
+              </p>
+            </div>
+          )}
 
           {/* Resend Verification */}
           <div className="mt-6 pt-6 border-t border-meckury-mediumGray">
@@ -216,7 +301,7 @@ function VerifyEmailContent() {
               <button
                 type="button"
                 onClick={handleResendVerification}
-                disabled={resendLoading || countdown > 0}
+                disabled={resendLoading || countdown > 0 || !email}
                 className="text-sm text-meckury-primary hover:text-meckury-accent disabled:text-text-muted disabled:cursor-not-allowed transition-colors flex items-center justify-center mx-auto"
               >
                 {resendLoading ? (
@@ -245,7 +330,9 @@ function VerifyEmailContent() {
               <br />
               • Make sure you entered the correct email address
               <br />
-              • The token expires after a certain time
+              • The token expires after 24 hours
+              <br />
+              • If clicking the link doesn't work, copy and paste the token manually
             </p>
           </div>
 
