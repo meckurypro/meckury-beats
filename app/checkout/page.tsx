@@ -21,11 +21,17 @@ function CheckoutContent() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
+  const [paystackLoaded, setPaystackLoaded] = useState(false)
 
   useEffect(() => {
     checkAuth()
     if (beatId) {
       fetchBeat()
+    }
+    
+    // Check if Paystack is loaded
+    if (typeof window !== 'undefined' && (window as any).PaystackPop) {
+      setPaystackLoaded(true)
     }
   }, [beatId])
 
@@ -67,6 +73,7 @@ function CheckoutContent() {
   }
 
   const handlePaymentSuccess = async (reference: any) => {
+    console.log('Payment successful:', reference)
     setProcessing(true)
     
     try {
@@ -131,7 +138,35 @@ function CheckoutContent() {
   }
 
   const handlePaymentClose = () => {
+    console.log('Payment closed by user')
     toast.error('Payment cancelled')
+  }
+
+  // Fallback Paystack function in case the component doesn't work
+  const initializePaystack = () => {
+    if (processing) return
+    
+    // @ts-ignore
+    if (window.PaystackPop && user?.email) {
+      // @ts-ignore
+      const paystack = new window.PaystackPop()
+      paystack.newTransaction({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || '',
+        email: user.email,
+        amount: amount * 100,
+        ref: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        onSuccess: (transaction: any) => {
+          console.log('Transaction success:', transaction)
+          handlePaymentSuccess(transaction)
+        },
+        onCancel: () => {
+          handlePaymentClose()
+        },
+      })
+    } else {
+      console.error('Paystack not loaded or user email missing')
+      toast.error('Payment system not ready. Please refresh the page.')
+    }
   }
 
   const formatPrice = (price: number) => {
@@ -150,6 +185,21 @@ function CheckoutContent() {
     text: 'Pay with Paystack',
     onSuccess: handlePaymentSuccess,
     onClose: handlePaymentClose,
+  }
+
+  // Debug information (remove in production)
+  const debugInfo = () => {
+    console.log({
+      user: user?.email,
+      amount: amount,
+      publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY?.substring(0, 10) + '...',
+      paystackLoaded: paystackLoaded,
+      componentProps: {
+        ...componentProps,
+        email: user?.email?.substring(0, 10) + '...',
+        amount: componentProps.amount
+      }
+    })
   }
 
   if (loading) {
@@ -301,18 +351,40 @@ function CheckoutContent() {
                   </div>
                 </div>
 
+                {/* Debug button (remove in production) */}
+                <button
+                  onClick={debugInfo}
+                  className="hidden text-xs text-gray-500 mb-2"
+                >
+                  Debug Info
+                </button>
+
                 {/* Paystack Button */}
                 {!processing ? (
-                  <PaystackButton
-                    {...componentProps}
-                    className="btn-primary w-full flex items-center justify-center space-x-2"
-                  />
+                  <>
+                    {/* Try using PaystackButton */}
+                    {paystackLoaded ? (
+                      <PaystackButton
+                        {...componentProps}
+                        className="btn-primary w-full flex items-center justify-center space-x-2 py-4"
+                      />
+                    ) : (
+                      /* Fallback button */
+                      <button
+                        onClick={initializePaystack}
+                        className="btn-primary w-full flex items-center justify-center space-x-2 py-4"
+                      >
+                        <Lock className="w-5 h-5" />
+                        <span>Pay with Paystack</span>
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <button
                     disabled
-                    className="btn-primary w-full flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed"
+                    className="btn-primary w-full flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed py-4"
                   >
-                    <div className="spinner"></div>
+                    <div className="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Processing...</span>
                   </button>
                 )}
