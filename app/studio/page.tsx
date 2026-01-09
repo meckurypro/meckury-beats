@@ -78,14 +78,14 @@ export default function StudioPage() {
               </div>
 
               {/* Pricing Info */}
-              <div className="card bg-gradient-to-br from-meckury-primary to-meckury-accent">
+              <div className="card bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700">
                 <h3 className="text-2xl font-bold text-white mb-2">
                   Session Pricing
                 </h3>
-                <p className="text-white text-opacity-90 mb-4">
-                  Contact our manager for custom pricing based on your needs
+                <p className="text-gray-200 mb-4">
+                  Contact management for custom pricing based on your needs
                 </p>
-                <p className="text-white text-sm">
+                <p className="text-gray-300 text-sm">
                   💡 Studio sessions are more expensive than buying beats online, but you get a fully custom production tailored to you.
                 </p>
               </div>
@@ -99,7 +99,7 @@ export default function StudioPage() {
                 </h2>
 
                 <p className="text-text-secondary mb-8">
-                  To book a studio session with Meckury at CovaStoris, contact our manager Substance via WhatsApp or phone.
+                  To book a studio session with Meckury at CovaStoris, contact management via WhatsApp or phone.
                 </p>
 
                 {/* Contact Card */}
@@ -116,7 +116,7 @@ export default function StudioPage() {
                     className="btn-primary w-full flex items-center justify-center space-x-2 bg-[#25D366] hover:bg-[#20BA5A]"
                   >
                     <Phone className="w-5 h-5" />
-                    <span>WhatsApp: +234 705 595 5523</span>
+                    <span>WhatsApp</span>
                   </a>
 
                   <a
@@ -124,7 +124,7 @@ export default function StudioPage() {
                     className="btn-outline w-full flex items-center justify-center space-x-2"
                   >
                     <Phone className="w-5 h-5" />
-                    <span>Call: +234 705 595 5523</span>
+                    <span>Call</span>
                   </a>
                 </div>
 
@@ -141,7 +141,7 @@ export default function StudioPage() {
                     <MapPin className="w-5 h-5 text-meckury-primary mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="text-white font-semibold">Location</p>
-                      <p className="text-text-secondary">CovaStoris Studio, Lagos</p>
+                      <p className="text-text-secondary">CovaStoris Studio, Enugu</p>
                     </div>
                   </div>
                 </div>
@@ -173,7 +173,7 @@ export default function StudioPage() {
                   What's included in a session?
                 </h3>
                 <p className="text-text-secondary">
-                  Beat production, recording, mixing, and consultation. The exact deliverables depend on your package - discuss with Substance.
+                  Beat production, recording, mixing, and consultation. The exact deliverables depend on your package - discuss with management.
                 </p>
               </div>
               <div>
@@ -181,7 +181,7 @@ export default function StudioPage() {
                   How long is a session?
                 </h3>
                 <p className="text-text-secondary">
-                  Session length varies based on your needs. Discuss timing and pricing with our manager.
+                  Session length varies based on your needs. Discuss timing and pricing with management.
                 </p>
               </div>
               <div>
