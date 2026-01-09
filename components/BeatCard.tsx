@@ -92,14 +92,14 @@ export default function BeatCard({ beat }: BeatCardProps) {
           className="object-cover transition-transform duration-300 group-hover:scale-110"
         />
 
-        {/* Always Visible Play Button */}
-        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+        {/* Always Visible Play Button - FIXED: No overlay covering button */}
+        <div className="absolute inset-0 flex items-center justify-center">
           <button
             onClick={handlePlayPause}
-            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg ${
+            className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg z-10 ${
               isPlaying || isHovered
-                ? 'bg-red-700 hover:bg-red-800 shadow-red-500/50'
-                : 'bg-black/70 hover:bg-black/80 shadow-black/50'
+                ? 'bg-red-600 hover:bg-red-700 shadow-red-500/50'
+                : 'bg-black/60 hover:bg-black/70 shadow-black/50'
             }`}
           >
             {isPlaying ? (
@@ -110,16 +110,16 @@ export default function BeatCard({ beat }: BeatCardProps) {
           </button>
         </div>
 
-        {/* Darker Overlay on Hover */}
-        <div
-          className={`absolute inset-0 bg-black transition-opacity duration-300 ${
-            isHovered ? 'opacity-40' : 'opacity-0'
+        {/* Semi-transparent overlay on image (not covering button) */}
+        <div 
+          className={`absolute inset-0 transition-opacity duration-300 ${
+            isHovered ? 'bg-black opacity-40' : 'bg-black opacity-20'
           }`}
         />
 
         {/* Playing Indicator */}
         {isPlaying && (
-          <div className="absolute bottom-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 animate-pulse">
+          <div className="absolute bottom-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 animate-pulse z-20">
             <div className="w-2 h-2 bg-white rounded-full"></div>
             <span>PLAYING</span>
           </div>
@@ -127,7 +127,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
 
         {/* Exclusive Badge */}
         {beat.exclusive_sold && (
-          <div className="absolute top-3 right-3 bg-yellow-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1">
+          <div className="absolute top-3 right-3 bg-yellow-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 z-20">
             <Lock className="w-3 h-3" />
             <span>SOLD</span>
           </div>
@@ -135,7 +135,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
 
         {/* Play Count */}
         {beat.play_count > 0 && (
-          <div className="absolute top-3 left-3 bg-black bg-opacity-60 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1">
+          <div className="absolute top-3 left-3 bg-black bg-opacity-60 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1 z-20">
             <TrendingUp className="w-3 h-3" />
             <span>{beat.play_count} plays</span>
           </div>
