@@ -68,22 +68,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable}`}>
       <head>
-        {/* Add viewport meta tag for mobile responsiveness */}
+        {/* Viewport meta tag for mobile responsiveness */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         
-        {/* Paystack Script - Load early for payment processing */}
-        <script 
-          src="https://js.paystack.co/v1/inline.js" 
-          async 
-          defer
-          crossOrigin="anonymous"
-        />
-        
-        {/* Google Fonts */}
+        {/* Google Fonts preconnect for performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         
-        {/* Favicon */}
+        {/* Favicon links */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" href="/icon?<generated>" type="image/<generated>" sizes="<generated>" />
         <link rel="apple-touch-icon" href="/apple-touch-icon?<generated>" type="image/<generated>" sizes="<generated>" />
@@ -92,6 +84,8 @@ export default function RootLayout({
         <CartProvider>
           {children}
         </CartProvider>
+        
+        {/* Toast notifications with custom styling */}
         <Toaster
           position="top-right"
           toastOptions={{
@@ -115,39 +109,6 @@ export default function RootLayout({
             },
           }}
         />
-        
-        {/* Script to check if Paystack loaded (non-blocking) */}
-        <script dangerouslySetInnerHTML={{
-          __html: `
-            // Check if Paystack script loaded
-            function checkPaystackLoaded() {
-              if (typeof window !== 'undefined') {
-                const isLoaded = typeof window.PaystackPop !== 'undefined';
-                console.log('Paystack script loaded:', isLoaded);
-                if (!isLoaded) {
-                  // If not loaded after 3 seconds, try to reload
-                  setTimeout(() => {
-                    if (typeof window.PaystackPop === 'undefined') {
-                      console.warn('Paystack script not loaded, attempting to reload...');
-                      const script = document.createElement('script');
-                      script.src = 'https://js.paystack.co/v1/inline.js';
-                      script.async = true;
-                      script.defer = true;
-                      script.crossOrigin = 'anonymous';
-                      document.head.appendChild(script);
-                    }
-                  }, 3000);
-                }
-              }
-            }
-            
-            // Check when page loads
-            window.addEventListener('load', checkPaystackLoaded);
-            
-            // Also check after a short delay
-            setTimeout(checkPaystackLoaded, 1000);
-          `
-        }} />
       </body>
     </html>
   )
