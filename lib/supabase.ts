@@ -239,59 +239,6 @@ export interface Database {
           artist_name: string
           platform: 'spotify' | 'youtube' | 'apple_music' | 'audiomack'
           external_url: string
-          embed_url: string | null
-          cover_art_url: string | null
-          status: 'pending' | 'approved' | 'rejected'
-          featured: boolean
-          admin_notes: string | null
-          approved_at: string | null
-          rejected_at: string | null
-        }
-        Insert: {
-          id?: string
-          created_at?: string
-          user_id: string
-          beat_id: string
-          song_title: string
-          artist_name: string
-          platform: 'spotify' | 'youtube' | 'apple_music' | 'audiomack'
-          external_url: string
-          embed_url?: string | null
-          cover_art_url?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
-          featured?: boolean
-          admin_notes?: string | null
-          approved_at?: string | null
-          rejected_at?: string | null
-        }
-        Update: {
-          id?: string
-          created_at?: string
-          user_id?: string
-          beat_id?: string
-          song_title?: string
-          artist_name?: string
-          platform?: 'spotify' | 'youtube' | 'apple_music' | 'audiomack'
-          external_url?: string
-          embed_url?: string | null
-          cover_art_url?: string | null
-          status?: 'pending' | 'approved' | 'rejected'
-          featured?: boolean
-          admin_notes?: string | null
-          approved_at?: string | null
-          rejected_at?: string | null
-        }
-      }
-      song_submissions: {
-        Row: {
-          id: string
-          created_at: string
-          user_id: string
-          beat_id: string
-          song_title: string
-          artist_name: string
-          platform: 'spotify' | 'youtube' | 'apple_music' | 'audiomack'
-          external_url: string
           embed_url: string
           cover_art_url: string | null
           status: 'pending' | 'approved' | 'rejected'
