@@ -1,7 +1,6 @@
-// components/CartButton.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingCart, X, Plus, Minus, Trash2 } from 'lucide-react'
 import { useCart, type CartItem } from '@/context/CartContext'
@@ -11,6 +10,40 @@ export default function CartButton() {
   const router = useRouter()
   const { items, getItemCount, removeItem, updateQuantity, getSubtotal, clearCart } = useCart()
   const [isOpen, setIsOpen] = useState(false)
+  const cartPanelRef = useRef<HTMLDivElement>(null)
+
+  // Close cart when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (cartPanelRef.current && !cartPanelRef.current.contains(event.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      // Prevent body scroll when cart is open
+      document.body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
+  // Prevent body scroll on mobile
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
 
   const handleCheckout = () => {
     if (items.length === 1) {
@@ -30,40 +63,46 @@ export default function CartButton() {
       <button
         onClick={() => setIsOpen(true)}
         className="relative p-2 text-text-secondary hover:text-white transition-colors"
+        aria-label={`Shopping cart with ${getItemCount()} items`}
       >
         <ShoppingCart className="w-6 h-6" />
         {getItemCount() > 0 && (
-          <span className="absolute -top-1 -right-1 bg-meckury-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-meckury-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-bounce">
             {getItemCount()}
           </span>
         )}
       </button>
 
-      {/* Cart Dropdown */}
+      {/* Cart Overlay and Panel */}
       {isOpen && (
-        <>
-          {/* Backdrop */}
+        <div className="fixed inset-0 z-[9999]">
+          {/* Backdrop with higher blur */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300"
             onClick={() => setIsOpen(false)}
           />
 
           {/* Cart Panel */}
-          <div className="fixed inset-y-0 right-0 w-full max-w-md bg-background-card z-50 shadow-xl flex flex-col">
+          <div
+            ref={cartPanelRef}
+            className="absolute inset-y-0 right-0 w-full max-w-md bg-background-card shadow-2xl flex flex-col transform transition-transform duration-300 ease-out"
+            style={{ zIndex: 10000 }}
+          >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-meckury-mediumGray">
               <div className="flex items-center space-x-3">
                 <ShoppingCart className="w-6 h-6 text-meckury-primary" />
                 <h2 className="text-2xl font-bold text-white">Your Cart</h2>
                 {getItemCount() > 0 && (
-                  <span className="bg-meckury-primary text-white text-sm font-semibold rounded-full px-2 py-1">
+                  <span className="bg-meckury-primary text-white text-sm font-semibold rounded-full px-2 py-1 animate-pulse">
                     {getItemCount()} {getItemCount() === 1 ? 'item' : 'items'}
                   </span>
                 )}
               </div>
               <button
                 onClick={() => setIsOpen(false)}
-                className="p-2 text-text-secondary hover:text-white transition-colors"
+                className="p-2 text-text-secondary hover:text-white transition-colors rounded-lg hover:bg-meckury-mediumGray"
+                aria-label="Close cart"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -91,7 +130,7 @@ export default function CartButton() {
                   {items.map((item) => (
                     <div
                       key={`${item.beatId}-${item.licenseType}`}
-                      className="p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray"
+                      className="p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray hover:border-meckury-primary/50 transition-colors"
                     >
                       <div className="flex space-x-4">
                         {/* Beat Cover */}
@@ -103,7 +142,7 @@ export default function CartButton() {
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xl">
+                            <div className="w-full h-full flex items-center justify-center text-xl bg-gradient-to-br from-meckury-primary/20 to-meckury-secondary/20">
                               🎵
                             </div>
                           )}
@@ -112,12 +151,13 @@ export default function CartButton() {
                         {/* Beat Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex justify-between mb-2">
-                            <h4 className="text-white font-semibold truncate">
+                            <h4 className="text-white font-semibold truncate hover:text-meckury-primary transition-colors">
                               {item.beatTitle}
                             </h4>
                             <button
                               onClick={() => removeItem(item.beatId, item.licenseType)}
-                              className="text-text-muted hover:text-meckury-danger transition-colors ml-2"
+                              className="text-text-muted hover:text-meckury-danger transition-colors ml-2 p-1 rounded hover:bg-meckury-danger/10"
+                              aria-label={`Remove ${item.beatTitle} ${item.licenseType} from cart`}
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -126,18 +166,18 @@ export default function CartButton() {
                           <div className="flex flex-wrap gap-2 mb-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                               item.licenseType === 'exclusive'
-                                ? 'bg-meckury-primary bg-opacity-20 text-meckury-primary'
-                                : 'bg-meckury-secondary bg-opacity-20 text-meckury-secondary'
+                                ? 'bg-meckury-primary bg-opacity-20 text-meckury-primary border border-meckury-primary/30'
+                                : 'bg-meckury-secondary bg-opacity-20 text-meckury-secondary border border-meckury-secondary/30'
                             }`}>
                               {item.licenseType === 'exclusive' ? 'Exclusive' : 'Lease'}
                             </span>
                             {item.bpm && (
-                              <span className="px-2 py-1 bg-background rounded text-xs text-text-muted">
+                              <span className="px-2 py-1 bg-background rounded text-xs text-text-muted border border-meckury-mediumGray">
                                 {item.bpm} BPM
                               </span>
                             )}
                             {item.key && (
-                              <span className="px-2 py-1 bg-background rounded text-xs text-text-muted">
+                              <span className="px-2 py-1 bg-background rounded text-xs text-text-muted border border-meckury-mediumGray">
                                 {item.key}
                               </span>
                             )}
@@ -148,7 +188,8 @@ export default function CartButton() {
                             <div className="flex items-center space-x-3">
                               <button
                                 onClick={() => updateQuantity(item.beatId, item.licenseType, item.quantity - 1)}
-                                className="w-8 h-8 rounded-lg border border-meckury-mediumGray flex items-center justify-center text-text-secondary hover:text-white hover:border-white transition-colors"
+                                className="w-8 h-8 rounded-lg border border-meckury-mediumGray flex items-center justify-center text-text-secondary hover:text-white hover:border-white hover:bg-meckury-mediumGray transition-all active:scale-95"
+                                aria-label="Decrease quantity"
                               >
                                 <Minus className="w-4 h-4" />
                               </button>
@@ -157,13 +198,14 @@ export default function CartButton() {
                               </span>
                               <button
                                 onClick={() => updateQuantity(item.beatId, item.licenseType, item.quantity + 1)}
-                                className="w-8 h-8 rounded-lg border border-meckury-mediumGray flex items-center justify-center text-text-secondary hover:text-white hover:border-white transition-colors"
+                                className="w-8 h-8 rounded-lg border border-meckury-mediumGray flex items-center justify-center text-text-secondary hover:text-white hover:border-white hover:bg-meckury-mediumGray transition-all active:scale-95"
+                                aria-label="Increase quantity"
                               >
                                 <Plus className="w-4 h-4" />
                               </button>
                             </div>
                             <div className="text-right">
-                              <p className="text-meckury-primary font-bold">
+                              <p className="text-meckury-primary font-bold text-lg">
                                 {formatPrice(item.price * item.quantity)}
                               </p>
                               {item.quantity > 1 && (
@@ -186,7 +228,7 @@ export default function CartButton() {
               <div className="border-t border-meckury-mediumGray p-6 space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-text-secondary">Subtotal</span>
-                  <span className="text-white font-bold text-xl">
+                  <span className="text-white font-bold text-2xl">
                     {formatPrice(getSubtotal())}
                   </span>
                 </div>
@@ -194,14 +236,14 @@ export default function CartButton() {
                 <div className="space-y-3">
                   <button
                     onClick={handleCheckout}
-                    className="btn-primary w-full"
+                    className="btn-primary w-full py-4 text-lg font-semibold hover:shadow-lg hover:shadow-meckury-primary/30 transition-all"
                   >
                     {items.length === 1 ? 'Checkout Now' : 'Proceed to Checkout'}
                   </button>
                   
                   <button
                     onClick={clearCart}
-                    className="btn-outline w-full"
+                    className="btn-outline w-full py-3 hover:bg-meckury-danger/10 hover:border-meckury-danger hover:text-meckury-danger transition-all"
                   >
                     Clear Cart
                   </button>
@@ -211,7 +253,7 @@ export default function CartButton() {
                       setIsOpen(false)
                       router.push('/cart')
                     }}
-                    className="text-center w-full text-text-secondary hover:text-white transition-colors text-sm"
+                    className="text-center w-full text-text-secondary hover:text-white transition-colors text-sm py-2 hover:underline"
                   >
                     View Full Cart →
                   </button>
@@ -219,7 +261,7 @@ export default function CartButton() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
     </>
   )
