@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PaystackButton } from 'react-paystack'
 import { Lock, ShoppingCart, Check, ArrowLeft } from 'lucide-react'
@@ -9,7 +9,7 @@ import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -349,5 +349,17 @@ export default function CheckoutPage() {
 
       <Footer />
     </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner w-12 h-12"></div>
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   )
 }
