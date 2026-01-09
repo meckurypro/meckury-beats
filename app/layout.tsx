@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk } from 'next/font/google'
 import { CartProvider } from '@/context/CartContext'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
+import Script from 'next/script'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ 
@@ -70,6 +71,14 @@ export default function RootLayout({
       <head>
         {/* Add viewport meta tag for mobile responsiveness */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        
+        {/* Paystack Script - Load early */}
+        <Script
+          src="https://js.paystack.co/v1/inline.js"
+          strategy="beforeInteractive"
+          onLoad={() => console.log('Paystack script loaded successfully')}
+          onError={() => console.error('Failed to load Paystack script')}
+        />
       </head>
       <body className="min-h-screen bg-background">
         <CartProvider>
@@ -98,6 +107,17 @@ export default function RootLayout({
             },
           }}
         />
+        
+        {/* Debug script to check Paystack */}
+        <Script id="check-paystack">
+          {`
+            window.addEventListener('load', function() {
+              console.log('Window loaded, checking Paystack...');
+              console.log('PaystackPop exists:', typeof window.PaystackPop !== 'undefined');
+              console.log('Paystack public key exists:', typeof process !== 'undefined' && process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY ? 'Yes' : 'No');
+            });
+          `}
+        </Script>
       </body>
     </html>
   )
