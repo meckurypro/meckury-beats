@@ -14,10 +14,12 @@ import {
   Clock,
   TrendingUp,
   Lock,
+  Plus,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
+import { useCart } from '@/context/CartContext'
 import toast from 'react-hot-toast'
 
 export default function BeatDetailPage() {
@@ -27,6 +29,8 @@ export default function BeatDetailPage() {
   const [loading, setLoading] = useState(true)
   const [isPlaying, setIsPlaying] = useState(false)
   const [user, setUser] = useState<any>(null)
+  
+  const { addItem, isInCart } = useCart()
 
   useEffect(() => {
     if (params.slug) {
@@ -61,7 +65,40 @@ export default function BeatDetailPage() {
     }
   }
 
-  const handlePurchase = async (licenseType: 'lease' | 'exclusive') => {
+  const handleAddToCart = (licenseType: 'lease' | 'exclusive') => {
+    if (!beat) return
+
+    const price = licenseType === 'lease' ? beat.lease_price : beat.exclusive_price
+    
+    // Check if exclusive is sold
+    if (licenseType === 'exclusive' && beat.exclusive_sold) {
+      toast.error('This beat is no longer available for exclusive purchase')
+      return
+    }
+
+    // Check if already in cart
+    if (isInCart(beat.id, licenseType)) {
+      toast.error('This item is already in your cart')
+      return
+    }
+
+    addItem({
+      beatId: beat.id,
+      beatTitle: beat.title,
+      beatSlug: beat.slug,
+      coverArtUrl: beat.cover_art_url,
+      bpm: beat.bpm,
+      key: beat.key,
+      typeBeat: beat.type_beat,
+      licenseType,
+      price,
+      quantity: 1,
+    })
+
+    toast.success(`Added ${beat.title} ${licenseType} license to cart!`)
+  }
+
+  const handleDirectCheckout = (licenseType: 'lease' | 'exclusive') => {
     if (!user) {
       toast.error('Please sign in to purchase')
       router.push('/auth/signin')
@@ -273,13 +310,33 @@ export default function BeatDetailPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handlePurchase('lease')}
-                    className="btn-primary w-full flex items-center justify-center space-x-2"
-                  >
-                    <ShoppingCart className="w-5 h-5" />
-                    <span>Purchase Lease</span>
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleAddToCart('lease')}
+                      disabled={isInCart(beat.id, 'lease')}
+                      className="btn-outline flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isInCart(beat.id, 'lease') ? (
+                        <>
+                          <Check className="w-5 h-5" />
+                          <span>In Cart</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-5 h-5" />
+                          <span>Add to Cart</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleDirectCheckout('lease')}
+                      className="btn-primary flex-1 flex items-center justify-center space-x-2"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      <span>Buy Now</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Exclusive License */}
@@ -337,27 +394,43 @@ export default function BeatDetailPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handlePurchase('exclusive')}
-                    disabled={beat.exclusive_sold}
-                    className={`w-full flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg transition-all ${
-                      beat.exclusive_sold
-                        ? 'bg-meckury-mediumGray text-text-muted cursor-not-allowed'
-                        : 'bg-meckury-accent hover:bg-opacity-90 text-white hover:shadow-glow'
-                    }`}
-                  >
-                    {beat.exclusive_sold ? (
-                      <>
-                        <Lock className="w-5 h-5" />
-                        <span>Sold Out</span>
-                      </>
-                    ) : (
-                      <>
+                  {/* Action Buttons */}
+                  {beat.exclusive_sold ? (
+                    <button
+                      disabled
+                      className="w-full flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg bg-meckury-mediumGray text-text-muted cursor-not-allowed"
+                    >
+                      <Lock className="w-5 h-5" />
+                      <span>Sold Out</span>
+                    </button>
+                  ) : (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleAddToCart('exclusive')}
+                        disabled={isInCart(beat.id, 'exclusive')}
+                        className="btn-outline flex-1 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isInCart(beat.id, 'exclusive') ? (
+                          <>
+                            <Check className="w-5 h-5" />
+                            <span>In Cart</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-5 h-5" />
+                            <span>Add to Cart</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDirectCheckout('exclusive')}
+                        className="flex-1 flex items-center justify-center space-x-2 font-semibold py-3 px-6 rounded-lg bg-meckury-accent hover:bg-opacity-90 text-white hover:shadow-glow transition-all"
+                      >
                         <Download className="w-5 h-5" />
                         <span>Buy Exclusive</span>
-                      </>
-                    )}
-                  </button>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Need Help */}
