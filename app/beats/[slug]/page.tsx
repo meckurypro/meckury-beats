@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Lock,
   ExternalLink,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -32,6 +34,9 @@ export default function BeatDetailPage() {
   const [user, setUser] = useState<any>(null)
   const [featuredSong, setFeaturedSong] = useState<any>(null)
   const [audioRef, setAudioRef] = useState<HTMLAudioElement | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [volume, setVolume] = useState(1)
 
   useEffect(() => {
     if (params.slug) {
@@ -54,6 +59,11 @@ export default function BeatDetailPage() {
       
       audio.addEventListener('loadedmetadata', () => {
         console.log('Audio metadata loaded, duration:', audio.duration)
+        setDuration(audio.duration)
+      })
+      
+      audio.addEventListener('timeupdate', () => {
+        setCurrentTime(audio.currentTime)
       })
       
       audio.addEventListener('canplay', () => {
@@ -63,6 +73,7 @@ export default function BeatDetailPage() {
       audio.addEventListener('ended', () => {
         console.log('Audio ended')
         setIsPlaying(false)
+        setCurrentTime(0)
       })
       
       audio.addEventListener('error', (e) => {
@@ -80,26 +91,17 @@ export default function BeatDetailPage() {
       
       // Set source after all event listeners are attached
       audio.src = beat.mp3_url
+      audio.volume = volume
       setAudioRef(audio)
-    }
-
-    // Update progress bar every second when playing
-    let interval: NodeJS.Timeout | null = null
-    if (isPlaying && audioRef) {
-      interval = setInterval(() => {
-        // Force re-render to update progress
-        setBeat((prev: any) => ({ ...prev }))
-      }, 100)
     }
 
     // Cleanup
     return () => {
-      if (interval) clearInterval(interval)
       if (audioRef && !isPlaying) {
         audioRef.pause()
       }
     }
-  }, [beat, isPlaying, audioRef])
+  }, [beat, audioRef, isPlaying])
 
   const togglePlayPause = () => {
     if (!audioRef) {
@@ -290,24 +292,66 @@ export default function BeatDetailPage() {
 
                 {/* Audio progress bar */}
                 <div className="bg-background-elevated rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3 mb-3">
                     <Music className="w-5 h-5 text-red-500" />
                     <div className="flex-1">
-                      <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div 
+                        className="h-2 bg-gray-700 rounded-full overflow-hidden cursor-pointer hover:h-3 transition-all"
+                        onClick={(e) => {
+                          if (audioRef && duration) {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            const percent = (e.clientX - rect.left) / rect.width
+                            audioRef.currentTime = percent * duration
+                            setCurrentTime(audioRef.currentTime)
+                          }
+                        }}
+                      >
                         <div 
                           className="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-100"
                           style={{ 
-                            width: audioRef && audioRef.duration 
-                              ? `${(audioRef.currentTime / audioRef.duration) * 100}%` 
-                              : '0%' 
+                            width: duration ? `${(currentTime / duration) * 100}%` : '0%'
                           }}
                         ></div>
                       </div>
                     </div>
-                    <span className="text-text-secondary text-sm min-w-[40px]">
-                      {audioRef && audioRef.duration 
-                        ? `${Math.floor(audioRef.currentTime / 60)}:${String(Math.floor(audioRef.currentTime % 60)).padStart(2, '0')}`
-                        : '0:00'}
+                    <span className="text-text-secondary text-sm min-w-[80px] text-right">
+                      {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')} / {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
+                    </span>
+                  </div>
+                  
+                  {/* Volume Control */}
+                  <div className="flex items-center space-x-2 px-2">
+                    <button
+                      onClick={() => {
+                        const newVolume = volume > 0 ? 0 : 1
+                        setVolume(newVolume)
+                        if (audioRef) audioRef.volume = newVolume
+                      }}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      {volume > 0 ? (
+                        <Volume2 className="w-4 h-4" />
+                      ) : (
+                        <VolumeX className="w-4 h-4" />
+                      )}
+                    </button>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={volume * 100}
+                      onChange={(e) => {
+                        const newVolume = parseFloat(e.target.value) / 100
+                        setVolume(newVolume)
+                        if (audioRef) audioRef.volume = newVolume
+                      }}
+                      className="w-24 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                      style={{
+                        background: `linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(239, 68, 68) ${volume * 100}%, rgb(55, 65, 81) ${volume * 100}%, rgb(55, 65, 81) 100%)`
+                      }}
+                    />
+                    <span className="text-xs text-gray-500 min-w-[30px]">
+                      {Math.round(volume * 100)}%
                     </span>
                   </div>
                 </div>
