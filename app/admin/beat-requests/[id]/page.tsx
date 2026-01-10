@@ -47,6 +47,33 @@ interface BeatRequest {
   } | null
 }
 
+// Raw type from Supabase query
+interface BeatRequestRaw {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string
+  title: string
+  description: string
+  reference_urls: string[]
+  voice_note_url: string | null
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  admin_notes: string | null
+  linked_beat_id: string | null
+  completed_at: string | null
+  completed_by: string | null
+  profiles: {
+    id: string
+    email: string
+    full_name: string | null
+  }[]
+  beats: {
+    id: string
+    title: string
+    slug: string
+  }[] | null
+}
+
 interface Beat {
   id: string
   title: string
@@ -137,10 +164,20 @@ export default function BeatRequestDetailPage() {
 
       if (error) throw error
       
-      setRequest(data)
-      setSelectedBeatId(data.linked_beat_id || '')
-      setAdminNotes(data.admin_notes || '')
-      setStatus(data.status)
+      // Transform the data to handle arrays -> single objects
+      const rawData = data as BeatRequestRaw
+      const transformedData: BeatRequest = {
+        ...rawData,
+        profiles: rawData.profiles && rawData.profiles.length > 0 
+          ? rawData.profiles[0] 
+          : { id: '', email: '', full_name: null },
+        beats: rawData.beats && rawData.beats.length > 0 ? rawData.beats[0] : null
+      }
+      
+      setRequest(transformedData)
+      setSelectedBeatId(transformedData.linked_beat_id || '')
+      setAdminNotes(transformedData.admin_notes || '')
+      setStatus(transformedData.status)
     } catch (error) {
       console.error('Error fetching request:', error)
       toast.error('Failed to load request')
