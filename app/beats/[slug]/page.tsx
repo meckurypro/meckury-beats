@@ -23,6 +23,7 @@ import {
   Smile,
   Key as KeyIcon,
   Activity,
+  Sparkles,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -647,16 +648,25 @@ export default function BeatDetailPage() {
 
                 {/* Need Help */}
                 <div className="mt-6 p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray">
-                  <p className="text-text-secondary text-sm mb-2">
-                    Need a custom beat or want to book a studio session?
+                  <p className="text-text-secondary text-sm mb-3">
+                    Need something custom?
                   </p>
-                  <Link
-                    href="/studio"
-                    className="text-meckury-primary hover:text-meckury-accent font-semibold text-sm flex items-center space-x-1"
-                  >
-                    <Music className="w-4 h-4" />
-                    <span>Book at CovaStoris →</span>
-                  </Link>
+                  <div className="space-y-2">
+                    <Link
+                      href="/beats/request"
+                      className="text-meckury-primary hover:text-meckury-accent font-semibold text-sm flex items-center space-x-1 transition-colors"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>Request Custom Beat →</span>
+                    </Link>
+                    <Link
+                      href="/studio"
+                      className="text-meckury-accent hover:text-meckury-primary font-semibold text-sm flex items-center space-x-1 transition-colors"
+                    >
+                      <Music className="w-4 h-4" />
+                      <span>Book at CovaStoris →</span>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
