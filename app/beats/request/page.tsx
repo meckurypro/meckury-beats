@@ -281,8 +281,7 @@ export default function BeatRequestPage() {
           {/* Header */}
           <div className="mb-12 text-center">
             <div className="inline-flex items-center justify-center space-x-2 mb-4">
-              <Sparkles className="w-8 h-8 text-meckury-primary" />
-              <h1 className="text-5xl font-display font-bold text-white">
+                            <h1 className="text-5xl font-display font-bold text-white">
                 Request a Custom Beat
               </h1>
             </div>
@@ -548,8 +547,7 @@ export default function BeatRequestPage() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-5 h-5" />
-                    <span>Submit Beat Request</span>
+                                        <span>Submit Beat Request</span>
                   </>
                 )}
               </button>
