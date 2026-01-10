@@ -1,8 +1,9 @@
+// app/beats/page.tsx - Updated with Genre Browsing
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
-import { Search, Filter, SlidersHorizontal, Plus, Check, ShoppingCart } from 'lucide-react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Search, Filter, SlidersHorizontal, Plus, Check, ShoppingCart, Music2 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import BeatCard from '@/components/BeatCard'
@@ -109,11 +110,13 @@ function EnhancedBeatCard({ beat }: { beat: any }) {
 
 function BeatsContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [beats, setBeats] = useState<any[]>([])
   const [filteredBeats, setFilteredBeats] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
   const [filters, setFilters] = useState({
     genre: searchParams.get('genre') || 'all',
     mood: searchParams.get('mood') || 'all',
@@ -149,7 +152,7 @@ function BeatsContent() {
   // Apply filters when dependencies change
   useEffect(() => {
     applyFilters()
-  }, [beats, searchQuery, filters])
+  }, [beats, searchQuery, filters, selectedGenre])
 
   const fetchBeats = async () => {
     try {
@@ -172,6 +175,11 @@ function BeatsContent() {
   const applyFilters = () => {
     let filtered = [...beats]
 
+    // Selected genre filter (from Browse by Genre section)
+    if (selectedGenre) {
+      filtered = filtered.filter((beat) => beat.genre === selectedGenre)
+    }
+
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim()
@@ -185,7 +193,7 @@ function BeatsContent() {
       )
     }
 
-    // Genre filter
+    // Genre filter from dropdown
     if (filters.genre !== 'all') {
       filtered = filtered.filter((beat) => beat.genre === filters.genre)
     }
@@ -230,6 +238,7 @@ function BeatsContent() {
       availability: 'all',
     })
     setSearchQuery('')
+    setSelectedGenre(null)
   }
 
   const getGenreOptions = () => {
@@ -260,6 +269,29 @@ function BeatsContent() {
     ]
   }
 
+  // Get genres with beat counts
+  const getGenresWithCounts = () => {
+    const genreCounts = new Map<string, number>()
+    beats.forEach(beat => {
+      if (beat.genre) {
+        genreCounts.set(beat.genre, (genreCounts.get(beat.genre) || 0) + 1)
+      }
+    })
+    return Array.from(genreCounts.entries())
+      .map(([genre, count]) => ({ genre, count }))
+      .sort((a, b) => b.count - a.count)
+  }
+
+  const handleGenreSelect = (genre: string) => {
+    if (selectedGenre === genre) {
+      setSelectedGenre(null)
+    } else {
+      setSelectedGenre(genre)
+      // Scroll to beats grid
+      document.getElementById('beats-grid')?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
@@ -276,8 +308,63 @@ function BeatsContent() {
             </p>
           </div>
 
+          {/* Browse by Genre Section */}
+          {!loading && getGenresWithCounts().length > 0 && (
+            <div className="mb-12">
+              <h2 className="text-2xl font-bold text-white mb-6">Browse by Genre</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {getGenresWithCounts().map(({ genre, count }) => (
+                  <button
+                    key={genre}
+                    onClick={() => handleGenreSelect(genre)}
+                    className={`card p-6 text-left transition-all hover:shadow-glow group cursor-pointer ${
+                      selectedGenre === genre 
+                        ? 'ring-2 ring-meckury-primary bg-meckury-primary bg-opacity-10' 
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Music2 className={`w-8 h-8 transition-colors ${
+                        selectedGenre === genre 
+                          ? 'text-meckury-primary' 
+                          : 'text-text-muted group-hover:text-meckury-primary'
+                      }`} />
+                      <span className={`text-2xl font-bold transition-colors ${
+                        selectedGenre === genre 
+                          ? 'text-meckury-primary' 
+                          : 'text-text-secondary group-hover:text-white'
+                      }`}>
+                        {count}
+                      </span>
+                    </div>
+                    <h3 className={`text-lg font-semibold transition-colors ${
+                      selectedGenre === genre 
+                        ? 'text-white' 
+                        : 'text-text-secondary group-hover:text-white'
+                    }`}>
+                      {genre}
+                    </h3>
+                    <p className="text-text-muted text-sm mt-1">
+                      {count} {count === 1 ? 'beat' : 'beats'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+              {selectedGenre && (
+                <div className="mt-4 flex items-center justify-center">
+                  <button
+                    onClick={() => setSelectedGenre(null)}
+                    className="text-meckury-primary hover:text-meckury-accent font-medium"
+                  >
+                    Clear genre filter
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Search and Filter Bar */}
-          <div className="mb-8">
+          <div className="mb-8" id="beats-grid">
             <div className="flex flex-col md:flex-row gap-4 mb-4">
               {/* Search Input */}
               <div className="flex-1 relative">
@@ -301,7 +388,7 @@ function BeatsContent() {
               >
                 <SlidersHorizontal className="w-5 h-5" />
                 <span>Filters</span>
-                {Object.values(filters).some(f => f !== 'all') && (
+                {(Object.values(filters).some(f => f !== 'all') || selectedGenre) && (
                   <span className="bg-meckury-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                     !
                   </span>
@@ -451,7 +538,7 @@ function BeatsContent() {
           </div>
 
           {/* Active Filters Display */}
-          {Object.values(filters).some(f => f !== 'all') && (
+          {(Object.values(filters).some(f => f !== 'all') || selectedGenre) && (
             <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <p className="text-text-secondary">
                 Showing <span className="text-white font-semibold">{filteredBeats.length}</span> of{' '}
@@ -459,6 +546,11 @@ function BeatsContent() {
               </p>
               
               <div className="flex flex-wrap gap-2">
+                {selectedGenre && (
+                  <span className="badge badge-primary" aria-label={`Selected genre: ${selectedGenre}`}>
+                    {selectedGenre}
+                  </span>
+                )}
                 {filters.genre !== 'all' && (
                   <span className="badge badge-primary" aria-label={`Genre: ${filters.genre}`}>
                     {filters.genre}
@@ -502,11 +594,11 @@ function BeatsContent() {
                 No beats found
               </h3>
               <p className="text-text-secondary mb-6 max-w-md mx-auto">
-                {searchQuery || Object.values(filters).some(f => f !== 'all')
+                {searchQuery || Object.values(filters).some(f => f !== 'all') || selectedGenre
                   ? 'Try adjusting your filters or search query'
                   : 'No beats available at the moment. Check back soon!'}
               </p>
-              {(searchQuery || Object.values(filters).some(f => f !== 'all')) && (
+              {(searchQuery || Object.values(filters).some(f => f !== 'all') || selectedGenre) && (
                 <button 
                   onClick={resetFilters} 
                   className="btn-primary px-6 py-3"
@@ -519,7 +611,7 @@ function BeatsContent() {
           )}
 
           {/* Featured Beats Section */}
-          {!loading && beats.some(b => b.featured) && (
+          {!loading && beats.some(b => b.featured) && !selectedGenre && (
             <div className="mt-20">
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-bold text-white mb-2">
