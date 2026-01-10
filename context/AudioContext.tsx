@@ -1,7 +1,7 @@
-// context/AudioContext.tsx - Global audio manager to control playback
+// context/AudioContext.tsx - Global audio manager with cleanup on page exit/minimize
 'use client'
 
-import { createContext, useContext, useState, useRef, useCallback } from 'react'
+import { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react'
 
 interface AudioContextType {
   currentlyPlayingId: string | null
@@ -26,6 +26,33 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setCurrentlyPlayingId(null)
     onEndCallbackRef.current = null
   }, [])
+
+  // Stop audio when page visibility changes (minimize, tab switch, etc.)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden (minimized, switched tabs, etc.)
+        pauseAll()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [pauseAll])
+
+  // Cleanup audio on unmount (when leaving the page)
+  useEffect(() => {
+    return () => {
+      pauseAll()
+      if (audioRef.current) {
+        audioRef.current.src = ''
+        audioRef.current = null
+      }
+    }
+  }, [pauseAll])
 
   const play = useCallback(async (beatId: string, audioUrl: string, onEnd?: () => void) => {
     // If same beat is playing, do nothing
