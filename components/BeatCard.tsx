@@ -1,9 +1,10 @@
+// components/BeatCard.tsx - Updated with collaborators display
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Play, Pause, TrendingUp, Lock, ExternalLink } from 'lucide-react'
+import { Play, Pause, TrendingUp, Lock, ExternalLink, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface BeatCardProps {
@@ -12,10 +13,12 @@ interface BeatCardProps {
     title: string
     slug: string
     type_beat: string | null
+    collaborators: string | null
     cover_art_url: string
     mp3_url: string
     bpm: number | null
     key: string | null
+    genre: string | null
     lease_price: number
     exclusive_price: number
     exclusive_sold: boolean
@@ -30,12 +33,12 @@ export default function BeatCard({ beat }: BeatCardProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
-    // Create audio element - SIMPLE VERSION like original
+    // Create audio element
     if (!audioRef.current && beat.mp3_url) {
       const audio = new Audio(beat.mp3_url)
       audio.crossOrigin = 'anonymous'
       audio.volume = 0.7 // 70% volume for preview
-      audio.preload = 'metadata' // Just load metadata, not the whole file
+      audio.preload = 'metadata'
       
       audio.addEventListener('ended', () => {
         setIsPlaying(false)
@@ -86,7 +89,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
       audio.pause()
       setIsPlaying(false)
     } else {
-      // INCREMENT PLAY COUNT HERE before playing
+      // Increment play count before playing
       incrementPlayCount()
       
       // Play audio
@@ -132,7 +135,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
           </button>
         </div>
 
-        {/* Semi-transparent overlay on image (not covering button) */}
+        {/* Semi-transparent overlay */}
         <div 
           className={`absolute inset-0 transition-opacity duration-300 ${
             isHovered ? 'bg-black opacity-40' : 'bg-black opacity-20'
@@ -155,11 +158,18 @@ export default function BeatCard({ beat }: BeatCardProps) {
           </div>
         )}
 
-        {/* Play Count - Using local play count state */}
+        {/* Play Count */}
         {localPlayCount > 0 && (
           <div className="absolute top-3 left-3 bg-black bg-opacity-60 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1 z-20">
             <TrendingUp className="w-3 h-3" />
             <span>{localPlayCount} {localPlayCount === 1 ? 'play' : 'plays'}</span>
+          </div>
+        )}
+
+        {/* Genre Badge */}
+        {beat.genre && (
+          <div className="absolute bottom-3 right-3 bg-meckury-primary bg-opacity-90 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold z-20">
+            {beat.genre}
           </div>
         )}
       </div>
@@ -173,7 +183,17 @@ export default function BeatCard({ beat }: BeatCardProps) {
 
         {/* Type Beat Label */}
         {beat.type_beat && (
-          <p className="text-text-secondary text-sm mb-3">{beat.type_beat}</p>
+          <p className="text-text-secondary text-sm mb-2">{beat.type_beat}</p>
+        )}
+
+        {/* Collaborators */}
+        {beat.collaborators && (
+          <div className="flex items-center space-x-1 text-meckury-accent text-xs mb-3">
+            <Users className="w-3 h-3" />
+            <span className="truncate" title={beat.collaborators}>
+              ft. {beat.collaborators}
+            </span>
+          </div>
         )}
 
         {/* Metadata */}
