@@ -1,12 +1,66 @@
+/**
+ * Email API Route
+ * 
+ * Handles sending transactional emails via Resend for:
+ * - Beat ready for review notifications
+ * - Revision completed notifications
+ * - Client response notifications (to admin)
+ * - Refund initiated confirmations
+ * 
+ * @route POST /api/send-email
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-// Initialize Resend with API key
-const resend = new Resend(process.env.RESEND_API_KEY)
+/**
+ * Lazy initialization of Resend client
+ * Only creates instance when API is called, not during build
+ */
+let resendClient: Resend | null = null
 
-// Email templates
-const getEmailTemplate = (type: string, data: any) => {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://yourdomain.com'
+const getResendClient = () => {
+  if (!resendClient) {
+    const apiKey = process.env.RESEND_API_KEY
+    
+    if (!apiKey) {
+      throw new Error('RESEND_API_KEY environment variable is not set')
+    }
+    
+    resendClient = new Resend(apiKey)
+  }
+  
+  return resendClient
+}
+
+/**
+ * Email template data interface
+ */
+interface EmailData {
+  requestId: string
+  requestTitle: string
+  userName: string
+  beatTitle?: string
+  response?: 'approved' | 'revision' | 'rejected'
+}
+
+/**
+ * Email template response
+ */
+interface EmailTemplate {
+  subject: string
+  html: string
+}
+
+/**
+ * Generate email template based on type
+ * 
+ * @param type - Email template type
+ * @param data - Template data
+ * @returns Email template with subject and HTML
+ */
+const getEmailTemplate = (type: string, data: EmailData): EmailTemplate | null => {
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://meckurybeats.com'
   
   switch (type) {
     case 'ready_for_review':
@@ -184,7 +238,7 @@ const getEmailTemplate = (type: string, data: any) => {
     case 'client_response':
       // Email to admin when client responds
       return {
-        subject: `Client Response: ${data.response.toUpperCase()} - ${data.requestTitle}`,
+        subject: `Client Response: ${data.response?.toUpperCase()} - ${data.requestTitle}`,
         html: `
 <!DOCTYPE html>
 <html>
@@ -335,10 +389,24 @@ const getEmailTemplate = (type: string, data: any) => {
   }
 }
 
+/**
+ * POST endpoint for sending emails
+ * 
+ * @param request - Next.js request object
+ * @returns JSON response with success/error status
+ */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { type, to, ...data } = body
+
+    // Validate required fields
+    if (!type || !to) {
+      return NextResponse.json(
+        { error: 'Missing required fields: type and to' },
+        { status: 400 }
+      )
+    }
 
     // Get email template
     const template = getEmailTemplate(type, data)
@@ -355,30 +423,55 @@ export async function POST(request: NextRequest) {
     
     // For admin notifications, send to admin email
     if (type === 'client_response') {
-      recipient = process.env.ADMIN_EMAIL || 'admin@yourdomain.com'
+      recipient = process.env.ADMIN_EMAIL || 'admin@meckurybeats.com'
     }
+
+    // Get Resend client (lazy initialization)
+    const resend = getResendClient()
+
+    // Determine sender email based on environment
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Meckury Beats <noreply@meckurybeats.com>'
 
     // Send email via Resend
     const { data: emailData, error } = await resend.emails.send({
-      from: 'Meckury Beats <noreply@yourdomain.com>', // Change to your verified domain
+      from: fromEmail,
       to: recipient,
       subject: template.subject,
       html: template.html,
     })
 
     if (error) {
-      console.error('Resend error:', error)
+      console.error('Resend API error:', error)
       return NextResponse.json(
-        { error: 'Failed to send email' },
+        { error: 'Failed to send email', details: error },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ success: true, data: emailData })
-  } catch (error) {
-    console.error('Email API error:', error)
+    console.log('✅ Email sent successfully:', {
+      type,
+      to: recipient,
+      emailId: emailData?.id
+    })
+
+    return NextResponse.json({ 
+      success: true, 
+      data: emailData,
+      message: 'Email sent successfully'
+    })
+  } catch (error: any) {
+    console.error('❌ Email API error:', error)
+    
+    // Return more specific error messages
+    if (error.message?.includes('RESEND_API_KEY')) {
+      return NextResponse.json(
+        { error: 'Email service not configured. Please contact support.' },
+        { status: 503 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: error.message },
       { status: 500 }
     )
   }
