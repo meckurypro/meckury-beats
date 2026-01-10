@@ -62,6 +62,7 @@ export default function Navbar() {
 
   const navLinks = [
     { href: '/beats', label: 'Beats' },
+    { href: '/beats/request', label: 'Request Beat' },
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/studio', label: 'Book Session' },
     { href: '/about', label: 'About' },
