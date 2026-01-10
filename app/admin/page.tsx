@@ -306,6 +306,22 @@ export default function AdminDashboard() {
               </div>
             </Link>
 
+            <Link href="/admin/portfolio/create" className="card hover:shadow-glow transition-all">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-purple-500 bg-opacity-10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Music className="w-6 h-6 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-1">
+                    Upload Portfolio Track
+                  </h3>
+                  <p className="text-text-secondary text-sm">
+                    Add Meckury production to portfolio
+                  </p>
+                </div>
+              </div>
+            </Link>
+
             <Link href="/admin/stems" className="card hover:shadow-glow transition-all">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-meckury-secondary bg-opacity-10 rounded-full flex items-center justify-center flex-shrink-0">
