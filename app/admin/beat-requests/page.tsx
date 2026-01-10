@@ -47,6 +47,31 @@ interface BeatRequest {
   } | null
 }
 
+// Raw type from Supabase query
+interface BeatRequestRaw {
+  id: string
+  created_at: string
+  updated_at: string
+  user_id: string
+  title: string
+  description: string
+  reference_urls: string[]
+  voice_note_url: string | null
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  admin_notes: string | null
+  linked_beat_id: string | null
+  completed_at: string | null
+  completed_by: string | null
+  profiles: {
+    email: string
+    full_name: string | null
+  }[]
+  beats: {
+    title: string
+    slug: string
+  }[] | null
+}
+
 export default function AdminBeatRequestsPage() {
   const router = useRouter()
   const [requests, setRequests] = useState<BeatRequest[]>([])
@@ -112,7 +137,15 @@ export default function AdminBeatRequestsPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setRequests(data || [])
+      
+      // Transform the data to handle arrays -> single objects
+      const transformedData: BeatRequest[] = (data as BeatRequestRaw[])?.map(request => ({
+        ...request,
+        profiles: request.profiles && request.profiles.length > 0 ? request.profiles[0] : { email: '', full_name: null },
+        beats: request.beats && request.beats.length > 0 ? request.beats[0] : null
+      })) || []
+      
+      setRequests(transformedData)
     } catch (error) {
       console.error('Error fetching beat requests:', error)
       toast.error('Failed to load beat requests')
