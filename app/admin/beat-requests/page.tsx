@@ -79,16 +79,10 @@ export default function AdminBeatRequestsPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [filter, setFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed' | 'rejected'>('all')
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const [audioElements, setAudioElements] = useState<Map<string, HTMLAudioElement>>(new Map())
 
   useEffect(() => {
     checkAdmin()
-    return () => {
-      if (audioElement) {
-        audioElement.pause()
-        audioElement.src = ''
-      }
-    }
   }, [])
 
   useEffect(() => {
@@ -96,6 +90,17 @@ export default function AdminBeatRequestsPage() {
       fetchRequests()
     }
   }, [isAdmin])
+
+  // Cleanup all audio elements on unmount
+  useEffect(() => {
+    return () => {
+      audioElements.forEach((audio) => {
+        audio.pause()
+        audio.src = ''
+      })
+      setAudioElements(new Map())
+    }
+  }, [])
 
   const checkAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -172,19 +177,58 @@ export default function AdminBeatRequestsPage() {
   }
 
   const toggleAudio = (url: string) => {
+    // If already playing this audio, pause it
     if (playingAudio === url) {
-      audioElement?.pause()
-      setPlayingAudio(null)
-    } else {
-      if (audioElement) {
-        audioElement.pause()
+      const audio = audioElements.get(url)
+      if (audio) {
+        audio.pause()
       }
-      const audio = new Audio(url)
-      audio.onended = () => setPlayingAudio(null)
-      audio.play()
-      setAudioElement(audio)
-      setPlayingAudio(url)
+      setPlayingAudio(null)
+      return
     }
+
+    // Pause any currently playing audio
+    if (playingAudio) {
+      const currentAudio = audioElements.get(playingAudio)
+      if (currentAudio) {
+        currentAudio.pause()
+      }
+    }
+
+    // Get or create audio element for this URL
+    let audio = audioElements.get(url)
+    if (!audio) {
+      audio = new Audio()
+      audio.crossOrigin = 'anonymous'
+      audio.preload = 'metadata'
+      audio.src = url
+      
+      // Event handlers
+      audio.onended = () => {
+        setPlayingAudio(null)
+      }
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e)
+        toast.error('Failed to play audio. The file may be corrupted or in an unsupported format.')
+        setPlayingAudio(null)
+      }
+
+      // Store the audio element
+      const newMap = new Map(audioElements)
+      newMap.set(url, audio)
+      setAudioElements(newMap)
+    }
+
+    // Play the audio
+    audio.play()
+      .then(() => {
+        setPlayingAudio(url)
+      })
+      .catch((error) => {
+        console.error('Playback failed:', error)
+        toast.error('Failed to play audio')
+      })
   }
 
   const getStatusBadge = (status: BeatRequest['status']) => {
@@ -331,7 +375,7 @@ export default function AdminBeatRequestsPage() {
 
                     {/* Description */}
                     <div className="bg-background-elevated rounded-lg p-4">
-                      <p className="text-text-secondary whitespace-pre-wrap">
+                      <p className="text-text-secondary whitespace-pre-wrap line-clamp-3">
                         {request.description}
                       </p>
                     </div>
@@ -344,7 +388,7 @@ export default function AdminBeatRequestsPage() {
                           <span>Reference Tracks ({request.reference_urls.length})</span>
                         </h4>
                         <div className="space-y-2">
-                          {request.reference_urls.map((url, index) => (
+                          {request.reference_urls.slice(0, 2).map((url, index) => (
                             <a
                               key={index}
                               href={url}
@@ -355,6 +399,11 @@ export default function AdminBeatRequestsPage() {
                               {url}
                             </a>
                           ))}
+                          {request.reference_urls.length > 2 && (
+                            <p className="text-text-muted text-sm">
+                              +{request.reference_urls.length - 2} more
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -366,22 +415,36 @@ export default function AdminBeatRequestsPage() {
                           <Mic className="w-4 h-4" />
                           <span>Voice Note</span>
                         </h4>
-                        <button
-                          onClick={() => toggleAudio(request.voice_note_url!)}
-                          className="btn-primary flex items-center space-x-2"
-                        >
-                          {playingAudio === request.voice_note_url ? (
-                            <>
-                              <Pause className="w-4 h-4" />
-                              <span>Pause</span>
-                            </>
-                          ) : (
-                            <>
-                              <Play className="w-4 h-4" />
-                              <span>Play Voice Note</span>
-                            </>
-                          )}
-                        </button>
+                        <div className="flex items-center space-x-3">
+                          <button
+                            onClick={() => toggleAudio(request.voice_note_url!)}
+                            className="btn-primary flex items-center space-x-2"
+                          >
+                            {playingAudio === request.voice_note_url ? (
+                              <>
+                                <Pause className="w-4 h-4" />
+                                <span>Pause</span>
+                              </>
+                            ) : (
+                              <>
+                                <Play className="w-4 h-4" />
+                                <span>Play</span>
+                              </>
+                            )}
+                          </button>
+                          
+                          {/* Native HTML5 audio as fallback */}
+                          <audio
+                            controls
+                            preload="metadata"
+                            className="flex-1 h-10"
+                            crossOrigin="anonymous"
+                          >
+                            <source src={request.voice_note_url} type="audio/webm" />
+                            <source src={request.voice_note_url} type="audio/mpeg" />
+                            Your browser does not support audio playback.
+                          </audio>
+                        </div>
                       </div>
                     )}
 
