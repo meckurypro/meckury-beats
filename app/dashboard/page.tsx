@@ -241,7 +241,7 @@ export default function DashboardPage() {
           {beatRequests.length > 0 && (
             <div className="mb-12">
               <h2 className="text-3xl font-bold text-white mb-6 flex items-center space-x-2">
-                <Sparkles className="w-8 h-8 text-meckury-primary" />
+                
                 <span>My Beat Requests ({beatRequests.length})</span>
               </h2>
 
