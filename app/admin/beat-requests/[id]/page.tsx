@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -99,17 +99,11 @@ export default function BeatRequestDetailPage() {
   const [adminNotes, setAdminNotes] = useState('')
   const [status, setStatus] = useState<BeatRequest['status']>('pending')
 
-  const [playingAudio, setPlayingAudio] = useState<string | null>(null)
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     checkAdmin()
-    return () => {
-      if (audioElement) {
-        audioElement.pause()
-        audioElement.src = ''
-      }
-    }
   }, [])
 
   useEffect(() => {
@@ -118,6 +112,17 @@ export default function BeatRequestDetailPage() {
       fetchBeats()
     }
   }, [isAdmin, requestId])
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current = null
+      }
+    }
+  }, [])
 
   const checkAdmin = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -237,19 +242,41 @@ export default function BeatRequestDetailPage() {
     }
   }
 
-  const toggleAudio = (url: string) => {
-    if (playingAudio === url) {
-      audioElement?.pause()
-      setPlayingAudio(null)
-    } else {
-      if (audioElement) {
-        audioElement.pause()
+  const toggleAudio = () => {
+    if (!request?.voice_note_url) return
+
+    if (!audioRef.current) {
+      // Create new audio element
+      const audio = new Audio()
+      audio.crossOrigin = 'anonymous'
+      audio.preload = 'metadata'
+      audio.src = request.voice_note_url
+      
+      audio.onended = () => {
+        setIsPlaying(false)
       }
-      const audio = new Audio(url)
-      audio.onended = () => setPlayingAudio(null)
-      audio.play()
-      setAudioElement(audio)
-      setPlayingAudio(url)
+      
+      audio.onerror = (e) => {
+        console.error('Audio playback error:', e)
+        toast.error('Failed to play audio. The file may be corrupted or in an unsupported format.')
+        setIsPlaying(false)
+      }
+      
+      audioRef.current = audio
+    }
+
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      audioRef.current.play()
+        .then(() => {
+          setIsPlaying(true)
+        })
+        .catch((error) => {
+          console.error('Playback failed:', error)
+          toast.error('Failed to play audio')
+        })
     }
   }
 
@@ -347,12 +374,13 @@ export default function BeatRequestDetailPage() {
                     <Mic className="w-5 h-5" />
                     <span>Voice Note</span>
                   </h3>
-                  <div className="bg-background-elevated rounded-lg p-4">
+                  <div className="bg-background-elevated rounded-lg p-4 space-y-4">
+                    {/* Custom Player */}
                     <button
-                      onClick={() => toggleAudio(request.voice_note_url!)}
+                      onClick={toggleAudio}
                       className="btn-primary flex items-center space-x-2"
                     >
-                      {playingAudio === request.voice_note_url ? (
+                      {isPlaying ? (
                         <>
                           <Pause className="w-5 h-5" />
                           <span>Pause</span>
@@ -364,6 +392,21 @@ export default function BeatRequestDetailPage() {
                         </>
                       )}
                     </button>
+                    
+                    {/* Native HTML5 audio as fallback/alternative */}
+                    <div className="pt-4 border-t border-meckury-mediumGray">
+                      <p className="text-text-muted text-xs mb-2">Or use browser player:</p>
+                      <audio
+                        controls
+                        preload="metadata"
+                        className="w-full"
+                        crossOrigin="anonymous"
+                      >
+                        <source src={request.voice_note_url} type="audio/webm" />
+                        <source src={request.voice_note_url} type="audio/mpeg" />
+                        Your browser does not support audio playback.
+                      </audio>
+                    </div>
                   </div>
                 </div>
               )}
