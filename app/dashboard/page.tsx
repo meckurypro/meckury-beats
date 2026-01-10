@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Download, Music, Clock, CheckCircle, Upload, XCircle } from 'lucide-react'
+import { Download, Music, Clock, CheckCircle, Upload, XCircle, Sparkles } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import SongSubmissionForm from '@/components/SongSubmissionForm'
@@ -11,11 +11,25 @@ import { supabase } from '@/lib/supabase'
 import { formatDistanceToNow } from 'date-fns'
 import toast from 'react-hot-toast'
 
+interface BeatRequest {
+  id: string
+  created_at: string
+  title: string
+  description: string
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  linked_beat_id: string | null
+  beats: {
+    title: string
+    slug: string
+  } | null
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [purchases, setPurchases] = useState<any[]>([])
   const [submissions, setSubmissions] = useState<any[]>([])
+  const [beatRequests, setBeatRequests] = useState<BeatRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [showSubmissionForm, setShowSubmissionForm] = useState(false)
   const [selectedBeat, setSelectedBeat] = useState<any>(null)
@@ -33,6 +47,7 @@ export default function DashboardPage() {
     setUser(user)
     fetchPurchases(user.id)
     fetchSubmissions(user.id)
+    fetchBeatRequests(user.id)
   }
 
   const fetchPurchases = async (userId: string) => {
@@ -84,6 +99,32 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchBeatRequests = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('beat_requests')
+        .select(`
+          id,
+          created_at,
+          title,
+          description,
+          status,
+          linked_beat_id,
+          beats!beat_requests_linked_beat_id_fkey (
+            title,
+            slug
+          )
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setBeatRequests(data || [])
+    } catch (error) {
+      console.error('Error fetching beat requests:', error)
+    }
+  }
+
   const handleDownload = async (url: string, filename: string) => {
     try {
       const link = document.createElement('a')
@@ -115,11 +156,23 @@ export default function DashboardPage() {
         icon: <Clock className="w-4 h-4" />,
         label: 'Pending Review',
       },
+      in_progress: {
+        bg: 'bg-blue-500 bg-opacity-20',
+        text: 'text-blue-400',
+        icon: <Music className="w-4 h-4" />,
+        label: 'In Progress',
+      },
       approved: {
         bg: 'bg-meckury-success bg-opacity-20',
         text: 'text-meckury-success',
         icon: <CheckCircle className="w-4 h-4" />,
         label: 'Approved',
+      },
+      completed: {
+        bg: 'bg-meckury-success bg-opacity-20',
+        text: 'text-meckury-success',
+        icon: <CheckCircle className="w-4 h-4" />,
+        label: 'Completed',
       },
       rejected: {
         bg: 'bg-meckury-danger bg-opacity-20',
@@ -159,9 +212,69 @@ export default function DashboardPage() {
               My Dashboard
             </h1>
             <p className="text-text-secondary text-lg">
-              Manage your purchases and submissions
+              Manage your purchases, submissions, and beat requests
             </p>
           </div>
+
+          {/* Beat Requests Section */}
+          {beatRequests.length > 0 && (
+            <div className="mb-12">
+              <h2 className="text-3xl font-bold text-white mb-6 flex items-center space-x-2">
+                <Sparkles className="w-8 h-8 text-meckury-primary" />
+                <span>My Beat Requests ({beatRequests.length})</span>
+              </h2>
+
+              <div className="space-y-4">
+                {beatRequests.map((request) => (
+                  <div key={request.id} className="card">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2">
+                          <h3 className="text-xl font-bold text-white">
+                            {request.title}
+                          </h3>
+                          {getStatusBadge(request.status)}
+                        </div>
+                        
+                        <p className="text-text-secondary text-sm mb-3 line-clamp-2">
+                          {request.description}
+                        </p>
+
+                        <p className="text-text-muted text-xs">
+                          Requested {formatDistanceToNow(new Date(request.created_at), { addSuffix: true })}
+                        </p>
+
+                        {/* Completed - Show linked beat */}
+                        {request.status === 'completed' && request.linked_beat_id && request.beats && (
+                          <div className="mt-4 p-4 bg-meckury-success bg-opacity-10 border border-meckury-success rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <CheckCircle className="w-5 h-5 text-meckury-success" />
+                                <div>
+                                  <p className="text-white font-semibold">
+                                    Your beat is ready!
+                                  </p>
+                                  <p className="text-text-secondary text-sm">
+                                    {request.beats.title}
+                                  </p>
+                                </div>
+                              </div>
+                              <Link
+                                href={`/beats/${request.beats.slug}`}
+                                className="btn-primary text-sm"
+                              >
+                                View & Purchase
+                              </Link>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Purchases Section */}
           <div className="mb-12">
@@ -178,9 +291,15 @@ export default function DashboardPage() {
                 <p className="text-text-secondary mb-6">
                   Browse beats and make your first purchase
                 </p>
-                <Link href="/beats" className="btn-primary inline-flex items-center">
-                  Browse Beats
-                </Link>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link href="/beats" className="btn-primary inline-flex items-center">
+                    Browse Beats
+                  </Link>
+                  <Link href="/beats/request" className="btn-outline inline-flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Request Custom Beat</span>
+                  </Link>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
