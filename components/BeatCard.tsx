@@ -1,10 +1,10 @@
-// components/BeatCard.tsx - Updated with collaborators display
+// components/BeatCard.tsx - Minimal version, details shown on detail page
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Play, Pause, TrendingUp, Lock, ExternalLink, Users } from 'lucide-react'
+import { Play, Pause, TrendingUp, Lock, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface BeatCardProps {
@@ -13,12 +13,8 @@ interface BeatCardProps {
     title: string
     slug: string
     type_beat: string | null
-    collaborators: string | null
     cover_art_url: string
     mp3_url: string
-    bpm: number | null
-    key: string | null
-    genre: string | null
     lease_price: number
     exclusive_price: number
     exclusive_sold: boolean
@@ -165,16 +161,9 @@ export default function BeatCard({ beat }: BeatCardProps) {
             <span>{localPlayCount} {localPlayCount === 1 ? 'play' : 'plays'}</span>
           </div>
         )}
-
-        {/* Genre Badge */}
-        {beat.genre && (
-          <div className="absolute bottom-3 right-3 bg-meckury-primary bg-opacity-90 backdrop-blur-sm text-white px-3 py-1 rounded-full text-xs font-semibold z-20">
-            {beat.genre}
-          </div>
-        )}
       </div>
 
-      {/* Beat Info */}
+      {/* Beat Info - Minimal */}
       <div className="p-5">
         {/* Title */}
         <h3 className="text-xl font-semibold text-white mb-1 line-clamp-1">
@@ -183,40 +172,19 @@ export default function BeatCard({ beat }: BeatCardProps) {
 
         {/* Type Beat Label */}
         {beat.type_beat && (
-          <p className="text-text-secondary text-sm mb-2">{beat.type_beat}</p>
+          <p className="text-text-secondary text-sm mb-4">{beat.type_beat}</p>
         )}
-
-        {/* Collaborators */}
-        {beat.collaborators && (
-          <div className="flex items-center space-x-1 text-meckury-accent text-xs mb-3">
-            <Users className="w-3 h-3" />
-            <span className="truncate" title={beat.collaborators}>
-              ft. {beat.collaborators}
-            </span>
-          </div>
-        )}
-
-        {/* Metadata */}
-        <div className="flex items-center space-x-4 mb-4 text-text-muted text-sm">
-          {beat.bpm && <span>{beat.bpm} BPM</span>}
-          {beat.key && (
-            <>
-              <span>•</span>
-              <span>{beat.key}</span>
-            </>
-          )}
-        </div>
 
         {/* See Details Button */}
         <Link href={`/beats/${beat.slug}`}>
-          <button className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center space-x-2 group">
+          <button className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all flex items-center justify-center space-x-2 group mb-3">
             <span>See Details</span>
             <ExternalLink className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </Link>
 
-        {/* Price Info Below Button */}
-        <div className="mt-3 pt-3 border-t border-gray-700 flex items-center justify-between text-sm">
+        {/* Price Info */}
+        <div className="pt-3 border-t border-gray-700 flex items-center justify-between text-sm">
           <div>
             <span className="text-gray-400">Lease:</span>
             <span className="text-red-500 font-semibold ml-2">
