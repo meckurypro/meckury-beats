@@ -1,12 +1,14 @@
-// app/admin/beats/page.tsx - Updated version
+// app/admin/beats/page.tsx - Updated with Edit & Audit Log
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Edit, Trash2, Eye, RefreshCw, Music, TrendingUp } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, RefreshCw, Music, TrendingUp, History } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import BeatUploadForm from '@/components/BeatUploadForm'
+import BeatEditForm from '@/components/BeatEditForm'
+import BeatAuditLog from '@/components/BeatAuditLog'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -16,6 +18,8 @@ export default function AdminBeatsPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
+  const [editingBeat, setEditingBeat] = useState<any | null>(null)
+  const [auditLogBeat, setAuditLogBeat] = useState<any | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive' | 'sold'>('all')
 
@@ -69,8 +73,8 @@ export default function AdminBeatsPage() {
     fetchBeats()
   }
 
-  const handleDelete = async (beatId: string) => {
-    if (!confirm('Are you sure you want to delete this beat? This action cannot be undone.')) return
+  const handleDelete = async (beatId: string, beatTitle: string) => {
+    if (!confirm(`Are you sure you want to delete "${beatTitle}"? This action cannot be undone.`)) return
 
     try {
       const { error } = await supabase
@@ -329,6 +333,11 @@ export default function AdminBeatsPage() {
                               {beat.type_beat}
                             </p>
                           )}
+                          {beat.collaborators && (
+                            <p className="text-text-muted text-sm mb-2">
+                              <span className="text-meckury-primary">Collaborators:</span> {beat.collaborators}
+                            </p>
+                          )}
                           <div className="flex flex-wrap items-center gap-2 text-text-muted text-sm mb-3">
                             {beat.bpm && (
                               <span className="px-2 py-1 bg-background-elevated rounded">
@@ -422,17 +431,23 @@ export default function AdminBeatsPage() {
                         </div>
                         <div className="flex items-center space-x-2">
                           <button
-                            onClick={() => {
-                              toast('Edit feature coming soon. For now, you can edit directly in Supabase.')
-                            }}
+                            onClick={() => setAuditLogBeat(beat)}
                             className="btn-outline flex items-center space-x-1 px-3 py-1.5 text-sm"
-                            title="Edit (coming soon)"
+                            title="View edit history"
+                          >
+                            <History className="w-4 h-4" />
+                            <span>History</span>
+                          </button>
+                          <button
+                            onClick={() => setEditingBeat(beat)}
+                            className="btn-outline flex items-center space-x-1 px-3 py-1.5 text-sm"
+                            title="Edit beat"
                           >
                             <Edit className="w-4 h-4" />
                             <span>Edit</span>
                           </button>
                           <button
-                            onClick={() => handleDelete(beat.id)}
+                            onClick={() => handleDelete(beat.id, beat.title)}
                             className="btn-outline border-meckury-danger text-meckury-danger hover:bg-meckury-danger hover:text-white flex items-center space-x-1 px-3 py-1.5 text-sm"
                             title="Delete permanently"
                           >
@@ -458,6 +473,27 @@ export default function AdminBeatsPage() {
             fetchBeats()
             toast.success('Beat uploaded successfully!')
           }}
+        />
+      )}
+
+      {/* Edit Form */}
+      {editingBeat && (
+        <BeatEditForm
+          beat={editingBeat}
+          onClose={() => setEditingBeat(null)}
+          onSuccess={() => {
+            fetchBeats()
+            setEditingBeat(null)
+          }}
+        />
+      )}
+
+      {/* Audit Log */}
+      {auditLogBeat && (
+        <BeatAuditLog
+          beatId={auditLogBeat.id}
+          beatTitle={auditLogBeat.title}
+          onClose={() => setAuditLogBeat(null)}
         />
       )}
 
