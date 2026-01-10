@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Users,
   DollarSign,
+  Sparkles,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -27,6 +28,7 @@ export default function AdminDashboard() {
     totalRevenue: 0,
     pendingSubmissions: 0,
     pendingStemsRequests: 0,
+    pendingBeatRequests: 0,
   })
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -83,6 +85,12 @@ export default function AdminDashboard() {
         .select('*')
         .eq('status', 'pending_upload')
 
+      // Fetch pending beat requests
+      const { data: beatRequestsData } = await supabase
+        .from('beat_requests')
+        .select('*')
+        .eq('status', 'pending')
+
       // Calculate stats
       const totalBeats = beatsData?.length || 0
       const activeBeats = beatsData?.filter((b) => b.active)?.length || 0
@@ -91,6 +99,7 @@ export default function AdminDashboard() {
       const totalRevenue = purchasesData?.reduce((sum, p) => sum + p.amount, 0) || 0
       const pendingSubmissions = submissionsData?.length || 0
       const pendingStemsRequests = stemsData?.length || 0
+      const pendingBeatRequests = beatRequestsData?.length || 0
 
       setStats({
         totalBeats,
@@ -100,6 +109,7 @@ export default function AdminDashboard() {
         totalRevenue,
         pendingSubmissions,
         pendingStemsRequests,
+        pendingBeatRequests,
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -220,8 +230,34 @@ export default function AdminDashboard() {
             </div>
           </div>
 
+          {/* Beat Requests Alert (if any pending) */}
+          {stats.pendingBeatRequests > 0 && (
+            <div className="card bg-meckury-primary bg-opacity-10 border border-meckury-primary mb-12">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-meckury-primary bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-meckury-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-white mb-1">
+                    {stats.pendingBeatRequests} New Beat Request{stats.pendingBeatRequests !== 1 ? 's' : ''}
+                  </h3>
+                  <p className="text-text-secondary mb-4">
+                    Clients are waiting for custom beats. Review and start creating!
+                  </p>
+                  <Link
+                    href="/admin/beat-requests"
+                    className="btn-primary inline-flex items-center space-x-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>View Beat Requests</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Link href="/admin/beats" className="card hover:shadow-glow transition-all">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-meckury-primary bg-opacity-10 rounded-full flex items-center justify-center flex-shrink-0">
@@ -233,6 +269,22 @@ export default function AdminDashboard() {
                   </h3>
                   <p className="text-text-secondary text-sm">
                     Upload, edit, and delete beats
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            <Link href="/admin/beat-requests" className="card hover:shadow-glow transition-all">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-meckury-primary bg-opacity-10 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-6 h-6 text-meckury-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-1">
+                    Beat Requests
+                  </h3>
+                  <p className="text-text-secondary text-sm">
+                    Review custom beat requests
                   </p>
                 </div>
               </div>
