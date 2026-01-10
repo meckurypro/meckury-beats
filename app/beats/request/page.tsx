@@ -14,17 +14,27 @@ import {
   Pause,
   AlertCircle,
   CheckCircle,
-  Sparkles,
+  CreditCard,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 
+// Paystack type declarations
+declare global {
+  interface Window {
+    PaystackPop?: {
+      setup: (options: any) => { openIframe: () => void }
+    }
+  }
+}
+
 export default function BeatRequestPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
   
   // Form state
   const [title, setTitle] = useState('')
@@ -187,7 +197,28 @@ export default function BeatRequestPage() {
     setVoiceNoteFile(file)
   }
 
-  // Form submission
+  // Form validation
+  const validateForm = () => {
+    if (!title.trim()) {
+      toast.error('Please enter a title')
+      return false
+    }
+
+    if (!description.trim()) {
+      toast.error('Please enter a description')
+      return false
+    }
+
+    const validUrls = referenceUrls.filter((url) => url.trim() !== '')
+    if (validUrls.length === 0) {
+      toast.error('Please add at least one reference URL')
+      return false
+    }
+
+    return true
+  }
+
+  // Form submission - triggers payment
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -196,41 +227,105 @@ export default function BeatRequestPage() {
       return
     }
 
-    // Validation
-    if (!title.trim()) {
-      toast.error('Please enter a title')
+    if (!validateForm()) {
       return
     }
 
-    if (!description.trim()) {
-      toast.error('Please enter a description')
+    // Initiate payment
+    initiateBeatRequestPayment()
+  }
+
+  // Payment initialization
+  const initiateBeatRequestPayment = () => {
+    if (paymentProcessing) {
+      toast.error('Payment already in progress')
       return
     }
 
-    const validUrls = referenceUrls.filter((url) => url.trim() !== '')
-    if (validUrls.length === 0) {
-      toast.error('Please add at least one reference URL')
+    if (!window.PaystackPop) {
+      toast.error('Payment system is loading. Please wait a moment and try again.')
       return
     }
 
+    const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+    if (!paystackKey) {
+      toast.error('Payment configuration error. Please contact support.')
+      console.error('Paystack public key not configured')
+      return
+    }
+
+    if (!user?.email) {
+      toast.error('Email address is required for payment')
+      return
+    }
+
+    setPaymentProcessing(true)
+
+    try {
+      const handler = window.PaystackPop.setup({
+        key: paystackKey,
+        email: user.email,
+        amount: 10000 * 100, // ₦10,000 in kobo
+        ref: `beat-req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        currency: 'NGN',
+        channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+        metadata: {
+          type: 'beat_request_upfront',
+          user_id: user.id,
+          user_email: user.email,
+          request_title: title.trim(),
+        },
+        onSuccess: (response: any) => {
+          console.log('Payment successful:', response.reference)
+          handlePaymentSuccess(response.reference)
+        },
+        onCancel: () => {
+          console.log('Payment cancelled by user')
+          setPaymentProcessing(false)
+          toast.error('Payment cancelled')
+        },
+        onClose: () => {
+          setPaymentProcessing(false)
+        }
+      })
+
+      handler.openIframe()
+    } catch (error) {
+      console.error('Error initializing payment:', error)
+      toast.error('Failed to initialize payment. Please try again.')
+      setPaymentProcessing(false)
+    }
+  }
+
+  // Handle successful payment
+  const handlePaymentSuccess = async (paymentRef: string) => {
     setLoading(true)
 
     try {
       let voiceNoteUrl = null
 
-      // Upload voice note if exists (either recorded or file)
+      // Upload voice note if exists
       if (audioBlob || voiceNoteFile) {
+        console.log('Uploading voice note...')
+        
         const fileToUpload = audioBlob 
           ? new File([audioBlob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' })
           : voiceNoteFile!
 
-        const fileName = `${user.id}/${Date.now()}-${fileToUpload.name}`
+        const fileName = `${user.id}/${Date.now()}-${fileToUpload.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('beat-request-voices')
-          .upload(fileName, fileToUpload)
+          .upload(fileName, fileToUpload, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: fileToUpload.type
+          })
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw new Error(`Voice note upload failed: ${uploadError.message}`)
+        }
 
         // Get public URL
         const { data: urlData } = supabase.storage
@@ -238,9 +333,13 @@ export default function BeatRequestPage() {
           .getPublicUrl(fileName)
 
         voiceNoteUrl = urlData.publicUrl
+        console.log('Voice note uploaded:', voiceNoteUrl)
       }
 
-      // Insert beat request
+      // Get valid reference URLs
+      const validUrls = referenceUrls.filter((url) => url.trim() !== '')
+
+      // Create beat request with payment info
       const { error: insertError } = await supabase
         .from('beat_requests')
         .insert({
@@ -249,18 +348,30 @@ export default function BeatRequestPage() {
           description: description.trim(),
           reference_urls: validUrls,
           voice_note_url: voiceNoteUrl,
-          status: 'pending',
+          status: 'pending', // Waiting for producer to start
+          payment_reference: paymentRef,
+          payment_status: 'completed',
+          upfront_amount: 10000,
+          upfront_paid_at: new Date().toISOString(),
+          client_response: 'pending',
+          revision_count: 0,
+          strike_count: 0,
         })
 
       if (insertError) throw insertError
 
-      toast.success('Beat request submitted successfully! 🎵')
-      router.push('/dashboard')
-    } catch (error) {
+      toast.success('Payment successful! Your beat request has been submitted. 🎵')
+      
+      // Redirect to dashboard after short delay
+      setTimeout(() => {
+        router.push('/dashboard')
+      }, 1500)
+    } catch (error: any) {
       console.error('Error submitting request:', error)
-      toast.error('Failed to submit request. Please try again.')
+      toast.error(error.message || 'Failed to submit request. Please contact support.')
     } finally {
       setLoading(false)
+      setPaymentProcessing(false)
     }
   }
 
@@ -281,14 +392,20 @@ export default function BeatRequestPage() {
           {/* Header */}
           <div className="mb-12 text-center">
             <div className="inline-flex items-center justify-center space-x-2 mb-4">
-                            <h1 className="text-5xl font-display font-bold text-white">
+              <h1 className="text-5xl font-display font-bold text-white">
                 Request a Custom Beat
               </h1>
             </div>
-            <p className="text-text-secondary text-lg max-w-2xl mx-auto">
+            <p className="text-text-secondary text-lg max-w-2xl mx-auto mb-4">
               Share your vision with Meckury. Provide reference tracks, detailed descriptions, 
               and even voice notes to help bring your perfect beat to life.
             </p>
+            <div className="inline-flex items-center space-x-2 px-4 py-2 bg-meckury-primary bg-opacity-10 rounded-lg border border-meckury-primary">
+              <CreditCard className="w-5 h-5 text-meckury-primary" />
+              <span className="text-white font-semibold">
+                ₦10,000 upfront payment required
+              </span>
+            </div>
           </div>
 
           {/* Form */}
@@ -306,6 +423,7 @@ export default function BeatRequestPage() {
                 className="input w-full"
                 maxLength={100}
                 required
+                disabled={loading || paymentProcessing}
               />
               <p className="text-text-muted text-sm mt-2">
                 What would you like to call this beat?
@@ -324,6 +442,7 @@ export default function BeatRequestPage() {
                 className="input w-full min-h-[150px] resize-y"
                 maxLength={2000}
                 required
+                disabled={loading || paymentProcessing}
               />
               <p className="text-text-muted text-sm mt-2">
                 {description.length}/2000 characters
@@ -350,12 +469,14 @@ export default function BeatRequestPage() {
                       onChange={(e) => updateReferenceUrl(index, e.target.value)}
                       placeholder={`Reference track #${index + 1}`}
                       className="input flex-1"
+                      disabled={loading || paymentProcessing}
                     />
                     {referenceUrls.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeReferenceUrl(index)}
                         className="p-2 text-meckury-danger hover:bg-meckury-danger hover:bg-opacity-10 rounded-lg transition-colors"
+                        disabled={loading || paymentProcessing}
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
@@ -369,6 +490,7 @@ export default function BeatRequestPage() {
                   type="button"
                   onClick={addReferenceUrl}
                   className="mt-3 flex items-center space-x-2 text-meckury-primary hover:text-meckury-accent transition-colors font-semibold"
+                  disabled={loading || paymentProcessing}
                 >
                   <Plus className="w-5 h-5" />
                   <span>Add Another Reference</span>
@@ -396,6 +518,7 @@ export default function BeatRequestPage() {
                         type="button"
                         onClick={startRecording}
                         className="btn-primary flex items-center space-x-2 px-8 py-4"
+                        disabled={loading || paymentProcessing}
                       >
                         <Mic className="w-6 h-6" />
                         <span>Start Recording</span>
@@ -436,6 +559,7 @@ export default function BeatRequestPage() {
                       accept="audio/*"
                       onChange={handleFileUpload}
                       className="hidden"
+                      disabled={loading || paymentProcessing}
                     />
                   </label>
                 </div>
@@ -461,6 +585,7 @@ export default function BeatRequestPage() {
                       type="button"
                       onClick={togglePlayback}
                       className="btn-primary flex items-center space-x-2"
+                      disabled={loading || paymentProcessing}
                     >
                       {isPlaying ? (
                         <>
@@ -479,6 +604,7 @@ export default function BeatRequestPage() {
                       type="button"
                       onClick={deleteRecording}
                       className="btn-outline flex items-center space-x-2 text-meckury-danger hover:bg-meckury-danger hover:bg-opacity-10"
+                      disabled={loading || paymentProcessing}
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Delete</span>
@@ -507,6 +633,7 @@ export default function BeatRequestPage() {
                       type="button"
                       onClick={() => setVoiceNoteFile(null)}
                       className="p-2 text-meckury-danger hover:bg-meckury-danger hover:bg-opacity-10 rounded-lg transition-colors"
+                      disabled={loading || paymentProcessing}
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -521,13 +648,15 @@ export default function BeatRequestPage() {
                 <AlertCircle className="w-6 h-6 text-meckury-primary flex-shrink-0 mt-1" />
                 <div className="text-sm text-text-secondary space-y-2">
                   <p>
-                    <strong className="text-white">What happens next?</strong>
+                    <strong className="text-white">How It Works:</strong>
                   </p>
                   <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>Your request will be reviewed by Meckury</li>
-                    <li>Once your beat is created, you'll be notified</li>
-                    <li>The beat will be available for purchase (lease or exclusive)</li>
-                    <li>You'll have first access before it's released publicly</li>
+                    <li>Pay ₦10,000 upfront to submit your request</li>
+                    <li>Get your custom beat within 5-7 business days</li>
+                    <li>You have 2 chances to approve the beat</li>
+                    <li>If you love it: Pay ₦10k more (lease) or ₦70k (exclusive)</li>
+                    <li>If you pass twice: Get a full refund</li>
+                    <li>One free revision included</li>
                   </ul>
                 </div>
               </div>
@@ -537,17 +666,18 @@ export default function BeatRequestPage() {
             <div className="flex justify-center">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || paymentProcessing}
                 className="btn-primary px-12 py-4 text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-3"
               >
-                {loading ? (
+                {loading || paymentProcessing ? (
                   <>
                     <div className="spinner w-5 h-5"></div>
-                    <span>Submitting...</span>
+                    <span>{paymentProcessing ? 'Processing Payment...' : 'Submitting...'}</span>
                   </>
                 ) : (
                   <>
-                                        <span>Submit Beat Request</span>
+                    <CreditCard className="w-6 h-6" />
+                    <span>Pay ₦10,000 & Submit Request</span>
                   </>
                 )}
               </button>
