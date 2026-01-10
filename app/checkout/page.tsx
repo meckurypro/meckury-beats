@@ -1,5 +1,18 @@
 'use client'
 
+/**
+ * Checkout Page Component
+ * 
+ * Handles the complete checkout flow for beat purchases including:
+ * - Order summary display
+ * - Payment processing via Paystack
+ * - License information
+ * - Purchase record creation
+ * - Post-purchase redirects
+ * 
+ * @route /checkout?beat={id}&license={type}&amount={price}
+ */
+
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Check, ArrowLeft, CreditCard } from 'lucide-react'
@@ -7,57 +20,55 @@ import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { supabase } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import type { PaystackOptions, PaystackResponse } from '@/types/paystack'
 
 /**
- * Global type declarations for Paystack
+ * Beat data structure from database
  */
-declare global {
-  interface Window {
-    PaystackPop?: {
-      setup: (options: PaystackOptions) => { openIframe: () => void }
-    }
-  }
+interface Beat {
+  id: string
+  title: string
+  slug: string
+  type_beat?: string
+  bpm?: number
+  key?: string
+  cover_art_url?: string
+  lease_price: number
+  exclusive_price: number
+  exclusive_sold: boolean
+  exclusive_buyer_id?: string
 }
 
 /**
- * Paystack payment options interface
+ * License type for purchase
  */
-interface PaystackOptions {
-  key: string
-  email: string
-  amount: number
-  ref: string
-  currency?: string
-  channels?: string[]
-  metadata?: Record<string, any>
-  onSuccess?: (response: any) => void
-  onCancel?: () => void
-  onClose?: () => void
-}
+type LicenseType = 'lease' | 'exclusive'
 
 /**
  * Checkout Content Component
- * Handles payment flow with Paystack integration
+ * Main component handling payment flow with Paystack integration
  */
 function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // URL parameters
+  // Extract URL parameters
   const beatId = searchParams.get('beat')
-  const licenseType = searchParams.get('license') as 'lease' | 'exclusive'
+  const licenseType = searchParams.get('license') as LicenseType
   const amount = parseInt(searchParams.get('amount') || '0')
 
   // Component state
-  const [beat, setBeat] = useState<any>(null)
+  const [beat, setBeat] = useState<Beat | null>(null)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [paystackLoaded, setPaystackLoaded] = useState(false)
 
   /**
-   * Initialize component
-   * Check auth, fetch beat data, and verify Paystack is loaded
+   * Initialize component on mount
+   * - Check user authentication
+   * - Fetch beat details
+   * - Verify Paystack script loaded
    */
   useEffect(() => {
     checkAuth()
@@ -65,42 +76,52 @@ function CheckoutContent() {
       fetchBeat()
     }
     
-    // Check if Paystack script is loaded
+    // Verify Paystack script is available
     const checkPaystackScript = () => {
       if (typeof window !== 'undefined' && window.PaystackPop) {
         setPaystackLoaded(true)
-        console.log('✅ Paystack available on window object')
+        console.log('✅ Paystack payment library loaded successfully')
       } else {
-        console.warn('⚠️ Paystack not yet available')
+        console.warn('⚠️ Paystack library not yet available on window object')
       }
     }
     
     // Check immediately
     checkPaystackScript()
     
-    // Retry after delay (in case script loads late)
+    // Retry after delay to handle late script loading
     const timer = setTimeout(checkPaystackScript, 1500)
     
     return () => clearTimeout(timer)
   }, [beatId])
 
   /**
-   * Verify user authentication
-   * Redirect to sign-in if not authenticated
+   * Verify user authentication status
+   * Redirects to sign-in page if not authenticated
    */
   const checkAuth = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      toast.error('Please sign in to continue')
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      
+      if (error) throw error
+      
+      if (!user) {
+        toast.error('Please sign in to continue with your purchase')
+        router.push('/auth/signin')
+        return
+      }
+      
+      setUser(user)
+    } catch (error) {
+      console.error('Authentication check failed:', error)
+      toast.error('Authentication error. Please try signing in again.')
       router.push('/auth/signin')
-      return
     }
-    setUser(user)
   }
 
   /**
    * Fetch beat details from database
-   * Verify availability for exclusive purchases
+   * Validates exclusive availability if applicable
    */
   const fetchBeat = async () => {
     try {
@@ -112,9 +133,9 @@ function CheckoutContent() {
 
       if (error) throw error
       
-      // Verify exclusive beat is still available
+      // Validate exclusive license availability
       if (licenseType === 'exclusive' && data.exclusive_sold) {
-        toast.error('This beat is no longer available for exclusive purchase')
+        toast.error('This beat has already been sold exclusively')
         router.push(`/beats/${data.slug}`)
         return
       }
@@ -122,7 +143,7 @@ function CheckoutContent() {
       setBeat(data)
     } catch (error) {
       console.error('Error fetching beat:', error)
-      toast.error('Beat not found')
+      toast.error('Could not load beat details')
       router.push('/beats')
     } finally {
       setLoading(false)
@@ -130,11 +151,13 @@ function CheckoutContent() {
   }
 
   /**
-   * Handle successful payment
-   * Create purchase record and update beat status
+   * Handle successful payment completion
+   * Creates purchase records and updates beat status
+   * 
+   * @param response - Paystack payment response object
    */
-  const handlePaymentSuccess = async (response: any) => {
-    console.log('✅ Payment successful:', response.reference)
+  const handlePaymentSuccess = async (response: PaystackResponse) => {
+    console.log('✅ Payment successful - Reference:', response.reference)
     setProcessing(true)
     
     try {
@@ -154,9 +177,9 @@ function CheckoutContent() {
 
       if (purchaseError) throw purchaseError
 
-      // Handle exclusive purchase
+      // Handle exclusive purchase workflow
       if (licenseType === 'exclusive') {
-        // Mark beat as sold
+        // Mark beat as exclusively sold
         const { error: updateError } = await supabase
           .from('beats')
           .update({
@@ -167,7 +190,7 @@ function CheckoutContent() {
 
         if (updateError) throw updateError
 
-        // Create stems request for producer
+        // Create stems delivery request for producer
         const { error: stemsError } = await supabase
           .from('stems_requests')
           .insert({
@@ -180,35 +203,44 @@ function CheckoutContent() {
         if (stemsError) throw stemsError
       }
 
-      // Increment lease count for lease purchases
+      // Increment lease counter for lease purchases
       if (licenseType === 'lease') {
-        await supabase.rpc('increment_lease_count', { beat_id: beatId })
+        const { error: incrementError } = await supabase
+          .rpc('increment_lease_count', { beat_id: beatId })
+        
+        if (incrementError) {
+          console.error('Failed to increment lease count:', incrementError)
+          // Non-critical error, continue with success flow
+        }
       }
 
-      toast.success('Payment successful! Redirecting to your downloads...')
+      toast.success('🎉 Payment successful! Redirecting to your downloads...')
       
-      // Redirect to dashboard
+      // Redirect to user dashboard
       setTimeout(() => {
         router.push('/dashboard')
       }, 2000)
     } catch (error: any) {
       console.error('Error processing purchase:', error)
-      toast.error('Payment succeeded but there was an error. Please contact support.')
+      toast.error(
+        'Payment was successful but there was an error processing your order. ' +
+        'Please contact support with reference: ' + response.reference
+      )
     } finally {
       setProcessing(false)
     }
   }
 
   /**
-   * Handle payment modal close/cancellation
+   * Handle payment cancellation or modal close
    */
   const handlePaymentClose = () => {
-    console.log('Payment cancelled by user')
-    toast.error('Payment cancelled')
+    console.log('Payment cancelled or closed by user')
+    toast.error('Payment was cancelled')
   }
 
   /**
-   * Initialize Paystack payment modal
+   * Initialize and open Paystack payment modal
    * Validates all requirements before opening payment window
    */
   const initializePayment = useCallback(() => {
@@ -218,34 +250,37 @@ function CheckoutContent() {
       return
     }
 
-    // Validate user email
+    // Validate user email exists
     if (!user?.email) {
-      toast.error('Email address is required')
+      toast.error('Email address is required for payment')
       return
     }
 
-    // Verify Paystack script is loaded
+    // Verify Paystack library is loaded
     if (!window.PaystackPop) {
       toast.error('Payment system is still loading. Please wait a moment and try again.')
-      console.error('❌ Paystack not loaded. window.PaystackPop:', window.PaystackPop)
+      console.error('❌ Paystack not available. window.PaystackPop:', window.PaystackPop)
       return
     }
 
-    // Verify Paystack public key exists
+    // Verify Paystack public key is configured
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
     if (!paystackKey) {
       toast.error('Payment configuration error. Please contact support.')
-      console.error('❌ Paystack public key not found in environment variables')
+      console.error('❌ NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY not found in environment')
       return
     }
 
     try {
+      // Generate unique transaction reference
+      const transactionRef = `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      
       // Configure Paystack payment options
       const paystackOptions: PaystackOptions = {
         key: paystackKey,
         email: user.email,
-        amount: amount * 100, // Convert to kobo (Paystack requires smallest currency unit)
-        ref: `meckury-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        amount: amount * 100, // Convert to kobo (NGN smallest unit)
+        ref: transactionRef,
         currency: 'NGN',
         channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
         metadata: {
@@ -253,17 +288,18 @@ function CheckoutContent() {
           license_type: licenseType,
           customer_id: user.id,
           customer_email: user.email,
+          beat_title: beat?.title,
         },
-        onSuccess: (response: any) => {
-          console.log('Paystack payment successful:', response)
+        onSuccess: (response: PaystackResponse) => {
+          console.log('Paystack onSuccess callback triggered:', response)
           handlePaymentSuccess(response)
         },
         onCancel: () => {
-          console.log('Paystack payment cancelled by user')
+          console.log('Paystack onCancel callback triggered')
           handlePaymentClose()
         },
         onClose: () => {
-          console.log('Paystack payment window closed')
+          console.log('Paystack onClose callback triggered')
           handlePaymentClose()
         }
       }
@@ -271,22 +307,26 @@ function CheckoutContent() {
       console.log('Initializing Paystack payment...', {
         email: user.email,
         amount: amount,
-        currency: 'NGN'
+        currency: 'NGN',
+        reference: transactionRef
       })
 
-      // Initialize Paystack and open payment modal
+      // Initialize Paystack and open payment iframe
       const handler = window.PaystackPop.setup(paystackOptions)
       handler.openIframe()
     } catch (error) {
       console.error('❌ Error initializing Paystack payment:', error)
       toast.error('Failed to initialize payment. Please try again.')
     }
-  }, [processing, user, amount, beatId, licenseType])
+  }, [processing, user, amount, beatId, licenseType, beat])
 
   /**
-   * Format price in Nigerian Naira
+   * Format price in Nigerian Naira currency
+   * 
+   * @param price - Price in naira
+   * @returns Formatted currency string
    */
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number): string => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
@@ -294,16 +334,19 @@ function CheckoutContent() {
     }).format(price)
   }
 
-  // Loading state
+  // Loading state UI
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner w-12 h-12"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-text-secondary">Loading checkout...</p>
+        </div>
       </div>
     )
   }
 
-  // Guard: Ensure beat and user data exists
+  // Guard: Ensure required data exists
   if (!beat || !user) {
     return null
   }
@@ -314,16 +357,17 @@ function CheckoutContent() {
 
       <div className="pt-32 pb-20 bg-background">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Back Button */}
+          {/* Back Navigation */}
           <button
             onClick={() => router.back()}
-            className="flex items-center space-x-2 text-text-secondary hover:text-white transition-colors mb-8"
+            className="flex items-center space-x-2 text-text-secondary hover:text-white transition-colors mb-8 group"
+            aria-label="Go back"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span>Back</span>
           </button>
 
-          {/* Header */}
+          {/* Page Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl font-display font-bold text-white mb-2">
               Checkout
@@ -334,20 +378,21 @@ function CheckoutContent() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Order Summary */}
+            {/* Order Summary Section */}
             <div className="lg:col-span-2">
               <div className="card">
                 <h2 className="text-2xl font-bold text-white mb-6">
                   Order Summary
                 </h2>
 
+                {/* Beat Information Card */}
                 <div className="flex items-start space-x-4 mb-6">
                   {/* Beat Cover Art */}
                   <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-background-elevated">
                     {beat.cover_art_url ? (
                       <img
                         src={beat.cover_art_url}
-                        alt={beat.title}
+                        alt={`${beat.title} cover art`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -357,7 +402,7 @@ function CheckoutContent() {
                     )}
                   </div>
 
-                  {/* Beat Information */}
+                  {/* Beat Details */}
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-white mb-1">
                       {beat.title}
@@ -379,7 +424,7 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                {/* License Details */}
+                {/* License Information */}
                 <div className="border-t border-meckury-mediumGray pt-6">
                   <h3 className="text-lg font-semibold text-white mb-4">
                     {licenseType === 'lease' ? 'Lease License' : 'Exclusive Rights'}
@@ -389,30 +434,30 @@ function CheckoutContent() {
                     <div className="flex items-start space-x-2">
                       <Check className="w-5 h-5 text-meckury-success mt-0.5 flex-shrink-0" />
                       <span className="text-text-secondary text-sm">
-                        {licenseType === 'lease' ? 'MP3 & WAV files' : 'MP3, WAV & Stems'}
+                        {licenseType === 'lease' ? 'MP3 & WAV files included' : 'MP3, WAV & Stems included'}
                       </span>
                     </div>
                     <div className="flex items-start space-x-2">
                       <Check className="w-5 h-5 text-meckury-success mt-0.5 flex-shrink-0" />
                       <span className="text-text-secondary text-sm">
                         {licenseType === 'lease'
-                          ? 'Non-exclusive commercial use'
-                          : 'Full exclusive ownership'}
+                          ? 'Non-exclusive commercial use rights'
+                          : 'Full exclusive ownership and publishing rights'}
                       </span>
                     </div>
                     <div className="flex items-start space-x-2">
                       <Check className="w-5 h-5 text-meckury-success mt-0.5 flex-shrink-0" />
                       <span className="text-text-secondary text-sm">
                         {licenseType === 'lease'
-                          ? 'Instant download'
-                          : 'Stems prepared within 48 hours'}
+                          ? 'Instant download after payment'
+                          : 'Stems prepared and delivered within 48 hours'}
                       </span>
                     </div>
                     {licenseType === 'exclusive' && (
                       <div className="flex items-start space-x-2">
                         <Check className="w-5 h-5 text-meckury-success mt-0.5 flex-shrink-0" />
                         <span className="text-text-secondary text-sm">
-                          Beat removed from store after purchase
+                          Beat removed from store permanently after your purchase
                         </span>
                       </div>
                     )}
@@ -421,7 +466,7 @@ function CheckoutContent() {
               </div>
             </div>
 
-            {/* Payment Summary */}
+            {/* Payment Summary Section */}
             <div className="lg:col-span-1">
               <div className="card sticky top-32">
                 <h3 className="text-xl font-bold text-white mb-6">Payment</h3>
@@ -446,7 +491,7 @@ function CheckoutContent() {
                   </div>
                 </div>
 
-                {/* Payment Button */}
+                {/* Payment Action Button */}
                 {!processing ? (
                   <button
                     onClick={initializePayment}
@@ -454,6 +499,7 @@ function CheckoutContent() {
                     className={`btn-primary w-full flex items-center justify-center space-x-2 py-4 ${
                       (!paystackLoaded || !user?.email) ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
+                    aria-label="Proceed to payment"
                   >
                     <CreditCard className="w-5 h-5" />
                     <span>
@@ -464,13 +510,14 @@ function CheckoutContent() {
                   <button
                     disabled
                     className="btn-primary w-full flex items-center justify-center space-x-2 opacity-50 cursor-not-allowed py-4"
+                    aria-label="Processing payment"
                   >
                     <div className="spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Processing Payment...</span>
                   </button>
                 )}
 
-                {/* Security Notice */}
+                {/* Security Badge */}
                 <div className="mt-6 p-4 bg-background-elevated rounded-lg border border-meckury-mediumGray">
                   <div className="flex items-start space-x-2">
                     <Lock className="w-5 h-5 text-meckury-success mt-0.5 flex-shrink-0" />
@@ -489,7 +536,12 @@ function CheckoutContent() {
                 <div className="mt-4 p-3 bg-meckury-secondary bg-opacity-10 rounded-lg border border-meckury-secondary">
                   <p className="text-text-secondary text-xs">
                     By completing this purchase, you agree to our{' '}
-                    <a href="/licenses" className="text-meckury-primary hover:underline">
+                    <a 
+                      href="/licenses" 
+                      className="text-meckury-primary hover:underline"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       License Agreement
                     </a>
                   </p>
@@ -506,14 +558,17 @@ function CheckoutContent() {
 }
 
 /**
- * Checkout Page with Suspense boundary
- * Handles URL search params loading state
+ * Main Checkout Page Component
+ * Wrapped with Suspense boundary for search params loading
  */
 export default function CheckoutPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="spinner w-12 h-12"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="spinner w-12 h-12 mx-auto mb-4"></div>
+          <p className="text-text-secondary">Loading checkout...</p>
+        </div>
       </div>
     }>
       <CheckoutContent />
