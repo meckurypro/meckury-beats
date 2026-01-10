@@ -24,6 +24,20 @@ interface BeatRequest {
   } | null
 }
 
+// Raw type from Supabase query (beats comes as array)
+interface BeatRequestRaw {
+  id: string
+  created_at: string
+  title: string
+  description: string
+  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  linked_beat_id: string | null
+  beats: {
+    title: string
+    slug: string
+  }[] | null
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -119,7 +133,14 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      setBeatRequests(data || [])
+      
+      // Transform the data to handle beats array -> single object
+      const transformedData: BeatRequest[] = (data as BeatRequestRaw[])?.map(request => ({
+        ...request,
+        beats: request.beats && request.beats.length > 0 ? request.beats[0] : null
+      })) || []
+      
+      setBeatRequests(transformedData)
     } catch (error) {
       console.error('Error fetching beat requests:', error)
     }
