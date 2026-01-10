@@ -97,6 +97,53 @@ export interface Database {
           active?: boolean
         }
       }
+      beat_requests: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          user_id: string
+          title: string
+          description: string
+          reference_urls: string[] | null
+          voice_note_url: string | null
+          status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+          admin_notes: string | null
+          linked_beat_id: string | null
+          completed_at: string | null
+          completed_by: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          title: string
+          description: string
+          reference_urls?: string[] | null
+          voice_note_url?: string | null
+          status?: 'pending' | 'in_progress' | 'completed' | 'rejected'
+          admin_notes?: string | null
+          linked_beat_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          title?: string
+          description?: string
+          reference_urls?: string[] | null
+          voice_note_url?: string | null
+          status?: 'pending' | 'in_progress' | 'completed' | 'rejected'
+          admin_notes?: string | null
+          linked_beat_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+        }
+      }
       purchases: {
         Row: {
           id: string
