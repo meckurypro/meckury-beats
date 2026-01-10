@@ -1,4 +1,4 @@
-// app/beats/page.tsx - Updated with Genre Browsing
+// app/beats/page.tsx - Updated with AudioProvider wrapper
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
@@ -9,6 +9,7 @@ import Footer from '@/components/Footer'
 import BeatCard from '@/components/BeatCard'
 import { supabase } from '@/lib/supabase'
 import { useCart } from '@/context/CartContext'
+import { AudioProvider } from '@/context/AudioContext'
 import toast from 'react-hot-toast'
 
 // Quick Add Button Component for BeatCard
@@ -570,7 +571,7 @@ function BeatsContent() {
             </div>
           )}
 
-          {/* Beats Grid */}
+          {/* Beats Grid - Wrapped in AudioProvider */}
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -582,11 +583,13 @@ function BeatsContent() {
               ))}
             </div>
           ) : filteredBeats.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredBeats.map((beat) => (
-                <EnhancedBeatCard key={beat.id} beat={beat} />
-              ))}
-            </div>
+            <AudioProvider>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredBeats.map((beat) => (
+                  <EnhancedBeatCard key={beat.id} beat={beat} />
+                ))}
+              </div>
+            </AudioProvider>
           ) : (
             <div className="text-center py-16 card">
               <Filter className="w-16 h-16 text-meckury-mediumGray mx-auto mb-4" />
@@ -621,14 +624,16 @@ function BeatsContent() {
                   Handpicked selections from Meckury
                 </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {beats
-                  .filter(beat => beat.featured)
-                  .slice(0, 3)
-                  .map((beat) => (
-                    <EnhancedBeatCard key={beat.id} beat={beat} />
-                  ))}
-              </div>
+              <AudioProvider>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {beats
+                    .filter(beat => beat.featured)
+                    .slice(0, 3)
+                    .map((beat) => (
+                      <EnhancedBeatCard key={beat.id} beat={beat} />
+                    ))}
+                </div>
+              </AudioProvider>
             </div>
           )}
         </div>
