@@ -1,11 +1,12 @@
-// components/BeatCard.tsx - Minimal version, details shown on detail page
+// components/BeatCard.tsx - Updated to use global audio manager
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Play, Pause, TrendingUp, Lock, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useAudio } from '@/context/AudioContext'
 
 interface BeatCardProps {
   beat: {
@@ -23,34 +24,12 @@ interface BeatCardProps {
 }
 
 export default function BeatCard({ beat }: BeatCardProps) {
-  const [isPlaying, setIsPlaying] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const [localPlayCount, setLocalPlayCount] = useState(beat.play_count)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => {
-    // Create audio element
-    if (!audioRef.current && beat.mp3_url) {
-      const audio = new Audio(beat.mp3_url)
-      audio.crossOrigin = 'anonymous'
-      audio.volume = 0.7 // 70% volume for preview
-      audio.preload = 'metadata'
-      
-      audio.addEventListener('ended', () => {
-        setIsPlaying(false)
-      })
-      
-      audioRef.current = audio
-    }
-
-    // Cleanup
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current.src = ''
-      }
-    }
-  }, [beat.mp3_url])
+  const [hasIncrementedPlay, setHasIncrementedPlay] = useState(false)
+  const { play, pause, isPlaying } = useAudio()
+  
+  const isCurrentlyPlaying = isPlaying(beat.id)
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -61,6 +40,9 @@ export default function BeatCard({ beat }: BeatCardProps) {
   }
 
   const incrementPlayCount = async () => {
+    // Only increment once per session
+    if (hasIncrementedPlay) return
+
     try {
       const { error } = await supabase.rpc('increment_play_count', { 
         beat_id: beat.id 
@@ -68,6 +50,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
       
       if (!error) {
         setLocalPlayCount(prev => prev + 1)
+        setHasIncrementedPlay(true)
       }
     } catch (error) {
       console.error('Failed to increment play count:', error)
@@ -78,22 +61,17 @@ export default function BeatCard({ beat }: BeatCardProps) {
     e.preventDefault()
     e.stopPropagation()
     
-    const audio = audioRef.current
-    if (!audio) return
-
-    if (isPlaying) {
-      audio.pause()
-      setIsPlaying(false)
+    if (isCurrentlyPlaying) {
+      pause(beat.id)
     } else {
       // Increment play count before playing
       incrementPlayCount()
       
-      // Play audio
-      audio.play()
-        .then(() => setIsPlaying(true))
-        .catch((error) => {
-          console.error('Playback error:', error)
-        })
+      // Play audio through global manager
+      await play(beat.id, beat.mp3_url, () => {
+        // Callback when audio ends naturally
+        // Can add any cleanup here if needed
+      })
     }
   }
 
@@ -117,13 +95,13 @@ export default function BeatCard({ beat }: BeatCardProps) {
           <button
             onClick={handlePlayPause}
             className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg z-10 ${
-              isPlaying || isHovered
+              isCurrentlyPlaying || isHovered
                 ? 'bg-red-600 hover:bg-red-700 shadow-red-500/50'
                 : 'bg-black/60 hover:bg-black/70 shadow-black/50'
             }`}
-            aria-label={isPlaying ? `Pause ${beat.title}` : `Play ${beat.title}`}
+            aria-label={isCurrentlyPlaying ? `Pause ${beat.title}` : `Play ${beat.title}`}
           >
-            {isPlaying ? (
+            {isCurrentlyPlaying ? (
               <Pause className="w-8 h-8 text-white" fill="white" />
             ) : (
               <Play className="w-8 h-8 text-white ml-1" fill="white" />
@@ -139,7 +117,7 @@ export default function BeatCard({ beat }: BeatCardProps) {
         />
 
         {/* Playing Indicator */}
-        {isPlaying && (
+        {isCurrentlyPlaying && (
           <div className="absolute bottom-3 left-3 bg-red-600 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-1 animate-pulse z-20">
             <div className="w-2 h-2 bg-white rounded-full"></div>
             <span>PLAYING</span>
