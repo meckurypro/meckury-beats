@@ -14,6 +14,8 @@ import {
   Calendar,
   CheckCircle,
   Save,
+  Send,
+  AlertCircle,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -30,11 +32,19 @@ interface BeatRequest {
   description: string
   reference_urls: string[]
   voice_note_url: string | null
-  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  status: 'pending_payment' | 'pending' | 'in_progress' | 'awaiting_review' | 'revision_requested' | 'completed' | 'rejected' | 'refunded'
   admin_notes: string | null
   linked_beat_id: string | null
   completed_at: string | null
   completed_by: string | null
+  payment_reference: string | null
+  payment_status: 'pending' | 'completed' | 'refunded'
+  upfront_amount: number
+  upfront_paid_at: string | null
+  revision_count: number
+  client_response: 'pending' | 'pass' | 'revision' | 'approved'
+  response_deadline: string | null
+  strike_count: number
   profiles: {
     id: string
     email: string
@@ -47,7 +57,6 @@ interface BeatRequest {
   } | null
 }
 
-// Raw type from Supabase query
 interface BeatRequestRaw {
   id: string
   created_at: string
@@ -57,11 +66,19 @@ interface BeatRequestRaw {
   description: string
   reference_urls: string[]
   voice_note_url: string | null
-  status: 'pending' | 'in_progress' | 'completed' | 'rejected'
+  status: 'pending_payment' | 'pending' | 'in_progress' | 'awaiting_review' | 'revision_requested' | 'completed' | 'rejected' | 'refunded'
   admin_notes: string | null
   linked_beat_id: string | null
   completed_at: string | null
   completed_by: string | null
+  payment_reference: string | null
+  payment_status: 'pending' | 'completed' | 'refunded'
+  upfront_amount: number
+  upfront_paid_at: string | null
+  revision_count: number
+  client_response: 'pending' | 'pass' | 'revision' | 'approved'
+  response_deadline: string | null
+  strike_count: number
   profiles: {
     id: string
     email: string
@@ -113,7 +130,6 @@ export default function BeatRequestDetailPage() {
     }
   }, [isAdmin, requestId])
 
-  // Cleanup audio on unmount
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -169,7 +185,6 @@ export default function BeatRequestDetailPage() {
 
       if (error) throw error
       
-      // Transform the data to handle arrays -> single objects
       const rawData = data as BeatRequestRaw
       const transformedData: BeatRequest = {
         ...rawData,
@@ -207,8 +222,37 @@ export default function BeatRequestDetailPage() {
     }
   }
 
+  const sendEmailNotification = async (type: 'ready_for_review' | 'revision_completed') => {
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          to: request?.profiles.email,
+          userName: request?.profiles.full_name || 'there',
+          requestTitle: request?.title,
+          requestId: request?.id,
+          beatTitle: beats.find(b => b.id === selectedBeatId)?.title,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error('Email notification failed')
+      }
+    } catch (error) {
+      console.error('Error sending email:', error)
+    }
+  }
+
   const handleSave = async () => {
     if (!adminUser) return
+
+    // Validation
+    if ((status === 'awaiting_review' || status === 'completed') && !selectedBeatId) {
+      toast.error('Please select a beat before marking as ready for review or completed')
+      return
+    }
 
     setSaving(true)
 
@@ -218,11 +262,34 @@ export default function BeatRequestDetailPage() {
         status,
       }
 
-      // If marking as completed, add completion metadata
+      // If marking as ready for client review
+      if (status === 'awaiting_review' && selectedBeatId) {
+        updateData.linked_beat_id = selectedBeatId
+        
+        // Set 48-hour deadline for client response
+        const deadline = new Date()
+        deadline.setHours(deadline.getHours() + 48)
+        updateData.response_deadline = deadline.toISOString()
+        updateData.client_response = 'pending'
+
+        // Send email notification
+        await sendEmailNotification('ready_for_review')
+        toast.success('Client will be notified via email to review the beat')
+      }
+
+      // If marking as completed (after client approval)
       if (status === 'completed' && selectedBeatId) {
         updateData.linked_beat_id = selectedBeatId
         updateData.completed_at = new Date().toISOString()
         updateData.completed_by = adminUser.id
+        
+        // Make beat public if client approved
+        if (request?.client_response === 'approved') {
+          await supabase
+            .from('beats')
+            .update({ active: true })
+            .eq('id', selectedBeatId)
+        }
       }
 
       const { error } = await supabase
@@ -246,7 +313,6 @@ export default function BeatRequestDetailPage() {
     if (!request?.voice_note_url) return
 
     if (!audioRef.current) {
-      // Create new audio element
       const audio = new Audio()
       audio.crossOrigin = 'anonymous'
       audio.preload = 'metadata'
@@ -258,7 +324,7 @@ export default function BeatRequestDetailPage() {
       
       audio.onerror = (e) => {
         console.error('Audio playback error:', e)
-        toast.error('Failed to play audio. The file may be corrupted or in an unsupported format.')
+        toast.error('Failed to play audio')
         setIsPlaying(false)
       }
       
@@ -308,7 +374,7 @@ export default function BeatRequestDetailPage() {
               {request.title}
             </h1>
             
-            <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-text-muted mb-4">
               <div className="flex items-center space-x-2">
                 <User className="w-4 h-4" />
                 <span>{request.profiles.full_name || request.profiles.email}</span>
@@ -320,6 +386,45 @@ export default function BeatRequestDetailPage() {
                 </span>
               </div>
             </div>
+
+            {/* Payment & Status Info */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="card p-4 bg-meckury-success bg-opacity-10 border border-meckury-success">
+                <p className="text-text-muted text-xs uppercase mb-1">Payment Status</p>
+                <p className="text-white font-bold capitalize">{request.payment_status}</p>
+                <p className="text-text-secondary text-xs mt-1">
+                  ₦{request.upfront_amount.toLocaleString()} paid
+                </p>
+              </div>
+              
+              <div className="card p-4">
+                <p className="text-text-muted text-xs uppercase mb-1">Revision Count</p>
+                <p className="text-white font-bold">{request.revision_count} / 1</p>
+              </div>
+              
+              <div className="card p-4">
+                <p className="text-text-muted text-xs uppercase mb-1">Strike Count</p>
+                <p className="text-white font-bold">{request.strike_count} / 2</p>
+                {request.strike_count >= 2 && (
+                  <p className="text-meckury-danger text-xs mt-1">Refund eligible</p>
+                )}
+              </div>
+            </div>
+
+            {/* Client Response Deadline */}
+            {request.response_deadline && request.client_response === 'pending' && (
+              <div className="card bg-meckury-accent bg-opacity-10 border border-meckury-accent p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="w-5 h-5 text-meckury-accent flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white font-semibold">Awaiting Client Response</p>
+                    <p className="text-text-secondary text-sm">
+                      Deadline: {new Date(request.response_deadline).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -375,7 +480,6 @@ export default function BeatRequestDetailPage() {
                     <span>Voice Note</span>
                   </h3>
                   <div className="bg-background-elevated rounded-lg p-4 space-y-4">
-                    {/* Custom Player */}
                     <button
                       onClick={toggleAudio}
                       className="btn-primary flex items-center space-x-2"
@@ -393,7 +497,6 @@ export default function BeatRequestDetailPage() {
                       )}
                     </button>
                     
-                    {/* Native HTML5 audio as fallback/alternative */}
                     <div className="pt-4 border-t border-meckury-mediumGray">
                       <p className="text-text-muted text-xs mb-2">Or use browser player:</p>
                       <audio
@@ -426,13 +529,19 @@ export default function BeatRequestDetailPage() {
                 >
                   <option value="pending">Pending</option>
                   <option value="in_progress">In Progress</option>
+                  <option value="awaiting_review">Ready for Client Review</option>
+                  <option value="revision_requested">Revision Requested</option>
                   <option value="completed">Completed</option>
                   <option value="rejected">Rejected</option>
+                  <option value="refunded">Refunded</option>
                 </select>
+                <p className="text-text-muted text-xs mt-2">
+                  Current: <span className="text-white capitalize">{request.status.replace('_', ' ')}</span>
+                </p>
               </div>
 
-              {/* Link Beat (only if completing) */}
-              {status === 'completed' && (
+              {/* Link Beat */}
+              {(status === 'awaiting_review' || status === 'completed') && (
                 <div className="card">
                   <label className="block text-white font-semibold mb-2">
                     Link Beat *
@@ -452,7 +561,9 @@ export default function BeatRequestDetailPage() {
                     ))}
                   </select>
                   <p className="text-text-muted text-sm mt-2">
-                    Select the beat you created for this request
+                    {status === 'awaiting_review' 
+                      ? 'Client will be notified to review this beat'
+                      : 'Select the completed beat for this request'}
                   </p>
                 </div>
               )}
@@ -501,13 +612,18 @@ export default function BeatRequestDetailPage() {
               {/* Save Button */}
               <button
                 onClick={handleSave}
-                disabled={saving || (status === 'completed' && !selectedBeatId)}
+                disabled={saving || ((status === 'awaiting_review' || status === 'completed') && !selectedBeatId)}
                 className="btn-primary w-full flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? (
                   <>
                     <div className="spinner w-5 h-5"></div>
                     <span>Saving...</span>
+                  </>
+                ) : status === 'awaiting_review' ? (
+                  <>
+                    <Send className="w-5 h-5" />
+                    <span>Send to Client for Review</span>
                   </>
                 ) : (
                   <>
@@ -517,9 +633,9 @@ export default function BeatRequestDetailPage() {
                 )}
               </button>
 
-              {status === 'completed' && !selectedBeatId && (
+              {(status === 'awaiting_review' || status === 'completed') && !selectedBeatId && (
                 <p className="text-meckury-danger text-sm text-center">
-                  Please select a beat to mark as completed
+                  Please select a beat
                 </p>
               )}
             </div>
