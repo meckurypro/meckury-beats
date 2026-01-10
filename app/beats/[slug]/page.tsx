@@ -1,4 +1,4 @@
-// app/beats/[slug]/page.tsx - Refactored with enhanced details
+// app/beats/[slug]/page.tsx - Refactored with audio cleanup on exit
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -61,7 +61,7 @@ export default function BeatDetailPage() {
     // Create audio element
     const audio = new Audio(beat.mp3_url)
     audio.crossOrigin = 'anonymous'
-    audio.volume = 1
+    audio.volume = volume
     audioRef.current = audio
 
     // Event handlers
@@ -89,16 +89,29 @@ export default function BeatDetailPage() {
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('error', handleError as any)
 
-    // Cleanup
+    // Cleanup function - stops audio when component unmounts or beat changes
     return () => {
+      audio.pause()
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
       audio.removeEventListener('timeupdate', handleTimeUpdate)
       audio.removeEventListener('ended', handleEnded)
       audio.removeEventListener('error', handleError as any)
-      audio.pause()
       audio.src = ''
+      audioRef.current = null
     }
   }, [beat?.mp3_url])
+
+  // Additional cleanup on unmount to ensure audio stops
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current = null
+      }
+      setIsPlaying(false)
+    }
+  }, [])
 
   const togglePlayPause = () => {
     const audio = audioRef.current
@@ -167,6 +180,12 @@ export default function BeatDetailPage() {
       return
     }
 
+    // Stop audio before navigating away
+    if (audioRef.current) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    }
+
     // Redirect to checkout with beat and license type
     router.push(
       `/checkout?beat=${beat.id}&license=${licenseType}&amount=${
@@ -187,6 +206,28 @@ export default function BeatDetailPage() {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
     return `${mins}:${String(secs).padStart(2, '0')}`
+  }
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    const audio = audioRef.current
+    if (audio && duration) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const percent = (e.clientX - rect.left) / rect.width
+      audio.currentTime = percent * duration
+      setCurrentTime(audio.currentTime)
+    }
+  }
+
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume)
+    if (audioRef.current) {
+      audioRef.current.volume = newVolume
+    }
+  }
+
+  const toggleMute = () => {
+    const newVolume = volume > 0 ? 0 : 1
+    handleVolumeChange(newVolume)
   }
 
   if (loading) {
@@ -290,15 +331,7 @@ export default function BeatDetailPage() {
                     <div className="flex-1 min-w-0">
                       <div 
                         className="h-2 bg-gray-700 rounded-full overflow-hidden cursor-pointer hover:h-3 transition-all"
-                        onClick={(e) => {
-                          const audio = audioRef.current
-                          if (audio && duration) {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const percent = (e.clientX - rect.left) / rect.width
-                            audio.currentTime = percent * duration
-                            setCurrentTime(audio.currentTime)
-                          }
-                        }}
+                        onClick={handleSeek}
                       >
                         <div 
                           className="h-full bg-gradient-to-r from-red-500 to-red-600 transition-all duration-100"
@@ -316,11 +349,7 @@ export default function BeatDetailPage() {
                   {/* Volume Control */}
                   <div className="flex items-center space-x-2 px-2">
                     <button
-                      onClick={() => {
-                        const newVolume = volume > 0 ? 0 : 1
-                        setVolume(newVolume)
-                        if (audioRef.current) audioRef.current.volume = newVolume
-                      }}
+                      onClick={toggleMute}
                       className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
                     >
                       {volume > 0 ? (
@@ -334,11 +363,7 @@ export default function BeatDetailPage() {
                       min="0"
                       max="100"
                       value={volume * 100}
-                      onChange={(e) => {
-                        const newVolume = parseFloat(e.target.value) / 100
-                        setVolume(newVolume)
-                        if (audioRef.current) audioRef.current.volume = newVolume
-                      }}
+                      onChange={(e) => handleVolumeChange(parseFloat(e.target.value) / 100)}
                       className="w-24 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
                       style={{
                         background: `linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(239, 68, 68) ${volume * 100}%, rgb(55, 65, 81) ${volume * 100}%, rgb(55, 65, 81) 100%)`
