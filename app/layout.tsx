@@ -138,6 +138,13 @@ export default function RootLayout({
         
         {/* DNS prefetch for Supabase and other services */}
         <link rel="dns-prefetch" href="https://supabase.co" />
+        <link rel="dns-prefetch" href="https://js.paystack.co" />
+        
+        {/* Paystack Inline JS - CRITICAL for payment processing */}
+        <script 
+          src="https://js.paystack.co/v1/inline.js"
+          async
+        />
         
         {/* Structured Data for SEO */}
         <script
