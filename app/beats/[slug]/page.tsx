@@ -1,3 +1,4 @@
+// app/beats/[slug]/page.tsx - Refactored with enhanced details
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -17,6 +18,11 @@ import {
   ExternalLink,
   Volume2,
   VolumeX,
+  Users,
+  Tag,
+  Smile,
+  Key as KeyIcon,
+  Activity,
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
@@ -55,13 +61,12 @@ export default function BeatDetailPage() {
     // Create audio element
     const audio = new Audio(beat.mp3_url)
     audio.crossOrigin = 'anonymous'
-    audio.volume = 1 // Start at 100%
+    audio.volume = 1
     audioRef.current = audio
 
     // Event handlers
     const handleLoadedMetadata = () => {
       setDuration(audio.duration)
-      console.log('Audio loaded, duration:', audio.duration)
     }
 
     const handleTimeUpdate = () => {
@@ -93,7 +98,7 @@ export default function BeatDetailPage() {
       audio.pause()
       audio.src = ''
     }
-  }, [beat?.mp3_url]) // Removed volume from dependencies
+  }, [beat?.mp3_url])
 
   const togglePlayPause = () => {
     const audio = audioRef.current
@@ -178,6 +183,12 @@ export default function BeatDetailPage() {
     }).format(price)
   }
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${String(secs).padStart(2, '0')}`
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -196,6 +207,26 @@ export default function BeatDetailPage() {
 
       <div className="pt-32 pb-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Breadcrumb */}
+          <div className="mb-6 flex items-center space-x-2 text-sm text-text-muted">
+            <Link href="/beats" className="hover:text-meckury-primary transition-colors">
+              Beats
+            </Link>
+            <span>/</span>
+            {beat.genre && (
+              <>
+                <Link 
+                  href={`/beats?genre=${beat.genre}`} 
+                  className="hover:text-meckury-primary transition-colors"
+                >
+                  {beat.genre}
+                </Link>
+                <span>/</span>
+              </>
+            )}
+            <span className="text-white">{beat.title}</span>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Left Column - Beat Info */}
             <div>
@@ -225,18 +256,24 @@ export default function BeatDetailPage() {
               {/* Audio Player */}
               <div className="card mb-8">
                 <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h2 className="text-2xl font-bold text-white mb-1">
+                  <div className="flex-1 min-w-0 mr-4">
+                    <h2 className="text-2xl font-bold text-white mb-1 truncate">
                       {beat.title}
                     </h2>
                     {beat.type_beat && (
                       <p className="text-text-secondary">{beat.type_beat}</p>
                     )}
+                    {beat.collaborators && (
+                      <div className="flex items-center space-x-2 text-meckury-accent text-sm mt-2">
+                        <Users className="w-4 h-4" />
+                        <span>ft. {beat.collaborators}</span>
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={togglePlayPause}
                     disabled={!audioRef.current}
-                    className="w-14 h-14 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg shadow-red-500/50"
+                    className="w-14 h-14 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-lg shadow-red-500/50 flex-shrink-0"
                   >
                     {isPlaying ? (
                       <Pause className="w-6 h-6 text-white" fill="white" />
@@ -249,8 +286,8 @@ export default function BeatDetailPage() {
                 {/* Audio progress bar */}
                 <div className="bg-background-elevated rounded-lg p-4">
                   <div className="flex items-center space-x-3 mb-3">
-                    <Music className="w-5 h-5 text-red-500" />
-                    <div className="flex-1">
+                    <Music className="w-5 h-5 text-red-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
                       <div 
                         className="h-2 bg-gray-700 rounded-full overflow-hidden cursor-pointer hover:h-3 transition-all"
                         onClick={(e) => {
@@ -271,8 +308,8 @@ export default function BeatDetailPage() {
                         ></div>
                       </div>
                     </div>
-                    <span className="text-text-secondary text-sm min-w-[80px] text-right">
-                      {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')} / {Math.floor(duration / 60)}:{String(Math.floor(duration % 60)).padStart(2, '0')}
+                    <span className="text-text-secondary text-sm min-w-[80px] text-right flex-shrink-0">
+                      {formatTime(currentTime)} / {formatTime(duration)}
                     </span>
                   </div>
                   
@@ -284,7 +321,7 @@ export default function BeatDetailPage() {
                         setVolume(newVolume)
                         if (audioRef.current) audioRef.current.volume = newVolume
                       }}
-                      className="text-gray-400 hover:text-white transition-colors"
+                      className="text-gray-400 hover:text-white transition-colors flex-shrink-0"
                     >
                       {volume > 0 ? (
                         <Volume2 className="w-4 h-4" />
@@ -307,7 +344,7 @@ export default function BeatDetailPage() {
                         background: `linear-gradient(to right, rgb(239, 68, 68) 0%, rgb(239, 68, 68) ${volume * 100}%, rgb(55, 65, 81) ${volume * 100}%, rgb(55, 65, 81) 100%)`
                       }}
                     />
-                    <span className="text-xs text-gray-500 min-w-[30px]">
+                    <span className="text-xs text-gray-500 min-w-[30px] flex-shrink-0">
                       {Math.round(volume * 100)}%
                     </span>
                   </div>
@@ -316,51 +353,86 @@ export default function BeatDetailPage() {
 
               {/* Beat Details */}
               <div className="card">
-                <h3 className="text-xl font-semibold text-white mb-4">
-                  Beat Details
+                <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
+                  <Music className="w-5 h-5 mr-2 text-meckury-primary" />
+                  Beat Information
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                
+                <div className="grid grid-cols-2 gap-6 mb-6">
                   {beat.bpm && (
-                    <div>
-                      <p className="text-text-secondary text-sm mb-1">BPM</p>
-                      <p className="text-white font-semibold">{beat.bpm}</p>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 bg-meckury-primary bg-opacity-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Activity className="w-5 h-5 text-meckury-primary" />
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs uppercase mb-1">Tempo</p>
+                        <p className="text-white font-semibold text-lg">{beat.bpm} BPM</p>
+                      </div>
                     </div>
                   )}
+                  
                   {beat.key && (
-                    <div>
-                      <p className="text-text-secondary text-sm mb-1">Key</p>
-                      <p className="text-white font-semibold">{beat.key}</p>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 bg-meckury-accent bg-opacity-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <KeyIcon className="w-5 h-5 text-meckury-accent" />
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs uppercase mb-1">Key</p>
+                        <p className="text-white font-semibold text-lg">{beat.key}</p>
+                      </div>
                     </div>
                   )}
+                  
                   {beat.genre && (
-                    <div>
-                      <p className="text-text-secondary text-sm mb-1">Genre</p>
-                      <p className="text-white font-semibold">{beat.genre}</p>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 bg-meckury-success bg-opacity-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Tag className="w-5 h-5 text-meckury-success" />
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs uppercase mb-1">Genre</p>
+                        <Link 
+                          href={`/beats?genre=${beat.genre}`}
+                          className="text-white font-semibold text-lg hover:text-meckury-primary transition-colors"
+                        >
+                          {beat.genre}
+                        </Link>
+                      </div>
                     </div>
                   )}
+                  
                   {beat.mood && (
-                    <div>
-                      <p className="text-text-secondary text-sm mb-1">Mood</p>
-                      <p className="text-white font-semibold">{beat.mood}</p>
+                    <div className="flex items-start space-x-3">
+                      <div className="w-10 h-10 bg-yellow-500 bg-opacity-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <Smile className="w-5 h-5 text-yellow-500" />
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs uppercase mb-1">Mood</p>
+                        <p className="text-white font-semibold text-lg">{beat.mood}</p>
+                      </div>
                     </div>
                   )}
-                  <div>
-                    <p className="text-text-secondary text-sm mb-1">Plays</p>
-                    <p className="text-white font-semibold flex items-center">
-                      <TrendingUp className="w-4 h-4 mr-1 text-meckury-primary" />
+                </div>
+
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 gap-4 pt-6 border-t border-meckury-mediumGray">
+                  <div className="bg-background-elevated rounded-lg p-4">
+                    <p className="text-text-muted text-xs uppercase mb-2">Total Plays</p>
+                    <p className="text-white font-bold text-2xl flex items-center">
+                      <TrendingUp className="w-5 h-5 mr-2 text-meckury-primary" />
                       {beat.play_count}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-text-secondary text-sm mb-1">
-                      Leases Sold
-                    </p>
-                    <p className="text-white font-semibold">{beat.lease_count}</p>
+                  <div className="bg-background-elevated rounded-lg p-4">
+                    <p className="text-text-muted text-xs uppercase mb-2">Leases Sold</p>
+                    <p className="text-white font-bold text-2xl">{beat.lease_count}</p>
                   </div>
                 </div>
 
                 {beat.description && (
                   <div className="mt-6 pt-6 border-t border-meckury-mediumGray">
+                    <h4 className="text-sm font-semibold text-white mb-2 uppercase tracking-wide">
+                      Description
+                    </h4>
                     <p className="text-text-secondary leading-relaxed">
                       {beat.description}
                     </p>
@@ -370,8 +442,9 @@ export default function BeatDetailPage() {
                 {/* Featured Song (for exclusive-sold beats) */}
                 {beat.exclusive_sold && featuredSong && (
                   <div className="mt-6 pt-6 border-t border-meckury-mediumGray">
-                    <h4 className="text-lg font-semibold text-white mb-4">
-                      🎵 Song Made With This Beat
+                    <h4 className="text-lg font-semibold text-white mb-4 flex items-center">
+                      <Music className="w-5 h-5 mr-2 text-meckury-accent" />
+                      Song Made With This Beat
                     </h4>
                     <div className="bg-background-elevated rounded-lg p-4">
                       <div className="mb-4">
